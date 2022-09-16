@@ -45,13 +45,14 @@ local current_session = nil
 -- state machine
 local STATE = {
   SELECT_NA = 0,
-  SELECT_FILE = 1,
-  --SELECT_ACCURACY = 2,
-  READ_FILE_HEADER = 2,
-  SELECT_SENSORS = 3,
-  READ_FILE_DATA = 4,
-  PARSE_DATA = 5,
-  SHOW_GRAPH = 6
+  SELECT_FILE_INIT = 1,
+  SELECT_FILE = 2,
+  READ_FILE_HEADER = 3,
+  SELECT_SENSORS_INIT = 4,
+  SELECT_SENSORS = 5,
+  READ_FILE_DATA = 6,
+  PARSE_DATA = 7,
+  SHOW_GRAPH = 8
 }
 
 local state = STATE.SELECT_NA
@@ -70,21 +71,6 @@ local prevTotalSeconds = 0
 --Option data
 --local maxLines
 local current_option = 1
-
-local ENUM_FILES = 1
-local ENUM_ACCURACY = 2
-local fileSelection = {
-  { y = 40, label = "Log File", values = {}, value = -1, min = 1 },
-  --{ y = 70, label = "Accuracy", values = { "1/1 (read every line)", "1/2 (read every 2nd line)", "1/5 (read every 5th line)", "1/10 (read every 10th line) min/max may not be found" }, value = 1, min = 1 },
-  --{ y = 60, label = "Speed", values = { "Accurate", "Fast", "Use index" }, value = 1, min = 1, max = 2 },
-  --{ y = 60, label = "Speed", values = { "Accurate", "Fast" }, value = 1, min = 1, max = 2 },
-  --{ y = 150, label = "by", values = { "Date", "Model Name", "other" }, value = 1, min = 1, max = 2 }
-}
-
-local ENUM_SELECTION_ACCURACY = 1
-local selection_accuracy = {
-  { y = 40, label = "Accuracy", values = { "1/1 (read every line)", "1/2 (read every 2nd line)", "1/5 (read every 5th line)", "1/10 (read every 10th line) min/max may not be found" }, value = 1, min = 1 },
-}
 
 local sensorSelection = {
   { y = 80, label = "Var 1", values = {}, value = 1, min = 0 },
@@ -141,6 +127,7 @@ local libGUI = loadGUI()
 
 -- Instantiate a new GUI object
 local ctx1 = libGUI.newGUI()
+local ctx2 = libGUI.newGUI()
 
 -----------------------------------------------------------------
 local function log(s)
@@ -233,7 +220,11 @@ local function readHeader(file)
 
     local headerLine = string.sub(read, 0, index - 1)
 
-    columns = split(headerLine)
+    local columns_temp = split(headerLine)
+    for i = 2, #columns_temp, 1 do
+      local col = columns_temp[i]
+      columns[#columns + 1] = col
+    end
     return true
   end
 
@@ -632,38 +623,48 @@ local function read_files_list()
     -- F3A UNI recorde-2022-02-09-082937.csv
     local modelName, year, month, day, hour, min, sec, m, d, y = string.match(fileName, "(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv")
     if modelName ~= nil then
-      log1("log file: %s (is csv)", fileName)
+      --log1("log file: %s (is csv)", fileName)
       log(string.format("modelName:%s, day:%s, month:%s, year:%s, hour:%s, min:%s, sec:%s", modelName, day, month, year, hour, min, sec))
 
       --log1("os.time", os.time{year=year, month=month, day=day, hour=hour, min=min, sec=sec})
 
-      local file = io.open("/LOGS/" .. fileName, "r")
-      if file ~= nil then
-        --log(tostring(file))
-        --local current = file:seek()      -- get current position
-        --local size = file:seek("end")    -- get file size
-        --file:seek("set", current)        -- restore position
+      log_file_list[#log_file_list + 1] = fileName
 
-        local line_num = fileGetSize(file)
-        log1("line_num: %s", line_num)
-
-
-        --local file_size = io.seek(file, "end")
-        --log1("file_size: %s",file_size )
-        log_file_list[#log_file_list + 1] = fileName
-        fileSelection[ENUM_FILES].values[#fileSelection[ENUM_FILES].values + 1] = fileName
-
-        if model_name_list[#model_name_list] ~= modelName then
-          model_name_list[#model_name_list + 1] = modelName
-        end
-
-        local model_day = string.format("%s-%s-%s", year, month, day)
-        if date_list[#date_list] ~= model_day then
-          date_list[#date_list + 1] = model_day
-        end
-
-        io.close(file)
+      if model_name_list[#model_name_list] ~= modelName then
+        model_name_list[#model_name_list + 1] = modelName
       end
+
+      local model_day = string.format("%s-%s-%s", year, month, day)
+      if date_list[#date_list] ~= model_day then
+        date_list[#date_list + 1] = model_day
+      end
+
+
+      --local file = io.open("/LOGS/" .. fileName, "r")
+      --if file ~= nil then
+      --  --log(tostring(file))
+      --  --local current = file:seek()      -- get current position
+      --  --local size = file:seek("end")    -- get file size
+      --  --file:seek("set", current)        -- restore position
+      --
+      --  local line_num = fileGetSize(file)
+      --  log1("line_num: %s", line_num)
+      --
+      --
+      --  --local file_size = io.seek(file, "end")
+      --  --log1("file_size: %s",file_size )
+      --
+      --  if model_name_list[#model_name_list] ~= modelName then
+      --    model_name_list[#model_name_list + 1] = modelName
+      --  end
+      --
+      --  local model_day = string.format("%s-%s-%s", year, month, day)
+      --  if date_list[#date_list] ~= model_day then
+      --    date_list[#date_list + 1] = model_day
+      --  end
+      --
+      --  io.close(file)
+      --end
 
     end
   end
@@ -678,17 +679,23 @@ local function read_files_list()
     return a1 > b1
   end
 
+  function compare_dates(a, b)
+    return a > b
+  end
+
 
   --print_table("log_file_list-non-sort", log_file_list)
   table.sort(log_file_list, compare_file_names)
-  log("after sort")
+  --log("after sort")
   --print_table("log_file_list-sort", log_file_list)
 
-  log("before sort2")
-  --print_table("fileSelection-non-sort", fileSelection[ENUM_FILES].values)
-  table.sort(fileSelection[ENUM_FILES].values, compare_file_names)
-  log("after sort2")
-  --print_table("fileSelection-sort", fileSelection[ENUM_FILES].values)
+
+
+  --log("before sort2")
+  --print_table("date_list-non-sort", date_list)
+  table.sort(date_list, compare_dates)
+  --log("after sort2")
+  --print_table("date_list-sort", date_list)
 
 
 end
@@ -764,13 +771,63 @@ local function state_SELECT_FILE_init(event, touchState)
   local dd3 = ctx1.dropDown(90, 105, 380, 24, log_file_list, 1, onDropDownChange)
   onDropDownChange(dd3)
 
-
   ctx1.label(10, 130, 60, 24, "Accuracy")
   dd4 = ctx1.dropDown(90, 130, 380, 24, accuracy_list, 1, onAccuracyChange)
   onAccuracyChange(dd4)
 
+  state = STATE.SELECT_FILE
+  return 0
 end
 
+local function state_SELECT_SENSORS_INIT(event, touchState)
+  --Menu that does nothing
+  ctx2.label(10, 25, 120, 24, "Select sensors...", BOLD)
+
+  --local model_name_list = { "-- all --", "aaa", "bbb", "ccc" }
+  --local date_list = { "-- all --", "2017", "2018", "2019" }
+  ctx2.label(10, 55, 60, 24, "Var1")
+  ctx2.dropDown(90, 55, 380, 24, columns, 1,
+    function(obj)
+      local i = obj.selected
+      local var1 = columns[i]
+      log("Selected var1: " .. var1)
+      sensorSelection[1].value = i
+    end
+  )
+
+  ctx2.label(10, 80, 60, 24, "Var2")
+  ctx2.dropDown(90, 80, 380, 24, columns, 2,
+    function(obj)
+      local i = obj.selected
+      local var2 = columns[i]
+      log("Selected var2: " .. var2)
+      sensorSelection[2].value = i
+    end
+  )
+
+  ctx2.label(10, 105, 60, 24, "Var3")
+  ctx2.dropDown(90, 105, 380, 24, columns, 3,
+    function(obj)
+      local i = obj.selected
+      local var3 = columns[i]
+      log("Selected var3: " .. var3)
+      sensorSelection[3].value = i
+    end
+  )
+
+  ctx2.label(10, 130, 60, 24, "Var4")
+  ctx2.dropDown(90, 130, 380, 24, columns, 4,
+    function(obj)
+      local i = obj.selected
+      local var4 = columns[i]
+      log("Selected var4: " .. var4)
+      sensorSelection[4].value = i
+    end
+  )
+
+  state = STATE.SELECT_SENSORS
+  return 0
+end
 
 local function state_SELECT_FILE_refresh(event, touchState)
   -- ## escape
@@ -780,9 +837,6 @@ local function state_SELECT_FILE_refresh(event, touchState)
 
   -- ## file selected
   if event == EVT_VIRTUAL_NEXT_PAGE then
-    --local selected_id = fileSelection[ENUM_FILES].value
-    --filename = fileSelection[ENUM_FILES].values[selected_id]
-
     --Reset file load data
     log("Reset file load data")
     buffer = ""
@@ -798,12 +852,6 @@ local function state_SELECT_FILE_refresh(event, touchState)
     state = STATE.READ_FILE_HEADER
     return 0
   end
-
-  if #fileSelection[ENUM_FILES].values == 0 then
-    lcd.drawText(5, graphConfig.y_start, "No recent log files found for the current model", TEXT_COLOR)
-    return 0
-  end
-
 
   -- --color test
   --local dx = 250
@@ -835,47 +883,6 @@ local function state_SELECT_FILE_refresh(event, touchState)
   return 0
 end
 
---local function state_SELECT_ACCURACY_refresh(event, touchState)
---  -- ## escape
---  if event == EVT_VIRTUAL_EXIT or event == EVT_VIRTUAL_PREV_PAGE then
---    filename = nil
---
---    state_SELECT_FILE_init(event, touchState)
---    state = STATE.SELECT_FILE
---    return 0
---  end
---
---  -- ## file selected
---  if event == EVT_VIRTUAL_NEXT_PAGE then
---    local accuracy = selection_accuracy[ENUM_SELECTION_ACCURACY].value
---    if accuracy == 1 then
---      skipLines = 1
---      heap = 2048 * 4
---    elseif accuracy == 2 then
---      skipLines = 2
---      heap = 2048 * 8
---    elseif accuracy == 3 then
---      skipLines = 5
---      heap = 2048 * 16
---    else
---      skipLines = 10
---      heap = 2048 * 16
---    end
---
---    state = STATE.READ_FILE_HEADER
---    return 0
---  end
---
---  if #selection_accuracy[ENUM_SELECTION_ACCURACY].values == 0 then
---    lcd.drawText(5, graphConfig.y_start, "No recent log files found for the current model", TEXT_COLOR)
---    return 0
---  end
---
---  drawOptions(selection_accuracy)
---  handleOptionInput(selection_accuracy, event)
---
---  return 0
---end
 
 local function state_READ_FILE_HEADER_refresh(event, touchState)
   log("state_READ_FILE_HEADER_refresh")
@@ -897,7 +904,7 @@ local function state_READ_FILE_HEADER_refresh(event, touchState)
     end
 
     current_option = 1
-    state = STATE.SELECT_SENSORS
+    state = STATE.SELECT_SENSORS_INIT
   end
 
   return 0
@@ -910,8 +917,7 @@ local function state_SELECT_SENSORS_refresh(event, touchState)
   elseif event == EVT_VIRTUAL_EXIT or event == EVT_VIRTUAL_PREV_PAGE then
     filename = nil
 
-    state_SELECT_FILE_init(event, touchState)
-    state = STATE.SELECT_FILE
+    state = STATE.SELECT_FILE_INIT
     return 0
 
     --elseif event == EVT_VIRTUAL_ENTER or event == EVT_ROT_BREAK then
@@ -940,16 +946,19 @@ local function state_SELECT_SENSORS_refresh(event, touchState)
     return 0
   end
 
-  lcd.drawText(5, 25, "Select vars to display on graph...", TEXT_COLOR)
+  --lcd.drawText(5, 25, "Select vars to display on graph...", TEXT_COLOR)
+  --
+  --drawOptions(sensorSelection)
+  --handleOptionInput(sensorSelection, event)
+  --
+  --local duration = toDuration2(getTotalSeconds(current_session.endTime) - getTotalSeconds(current_session.startTime))
+  --lcd.drawText(340, 200, string.format("time: %s", current_session.startTime), TEXT_COLOR)
+  --lcd.drawText(340, 220, string.format("duration: %s", duration), TEXT_COLOR)
+  ----lcd.drawText(100, 100, string.format("Duration %s (%d lines)", duration, lines), TEXT_COLOR)
+  --lcd.drawText(340, 240, string.format("lines: %d", lines), TEXT_COLOR)
 
-  drawOptions(sensorSelection)
-  handleOptionInput(sensorSelection, event)
+  ctx2.run(event, touchState)
 
-  local duration = toDuration2(getTotalSeconds(current_session.endTime) - getTotalSeconds(current_session.startTime))
-  lcd.drawText(340, 200, string.format("time: %s", current_session.startTime), TEXT_COLOR)
-  lcd.drawText(340, 220, string.format("duration: %s", duration), TEXT_COLOR)
-  --lcd.drawText(100, 100, string.format("Duration %s (%d lines)", duration, lines), TEXT_COLOR)
-  lcd.drawText(340, 240, string.format("lines: %d", lines), TEXT_COLOR)
 
   ---- draw sensor grid
   --local x = 10
@@ -1062,7 +1071,7 @@ end
 
 local function state_READ_FILE_DATA_refresh(event, touchState)
   if event == EVT_VIRTUAL_EXIT or event == EVT_VIRTUAL_PREV_PAGE then
-    state = STATE.SELECT_SENSORS
+    state = STATE.SELECT_SENSORS_INIT
     return 0
   end
 
@@ -1081,7 +1090,7 @@ local function state_PARSE_DATA_refresh(event, touchState)
     return 2
 
   elseif event == EVT_VIRTUAL_EXIT or event == EVT_VIRTUAL_PREV_PAGE then
-    state = STATE.SELECT_SENSORS
+    state = STATE.SELECT_SENSORS_INIT
     return 0
   end
 
@@ -1249,7 +1258,7 @@ end
 
 local function state_SHOW_GRAPH_refresh(event, touchState)
   if event == EVT_VIRTUAL_EXIT or event == EVT_VIRTUAL_PREV_PAGE then
-    state = STATE.SELECT_SENSORS
+    state = STATE.SELECT_SENSORS_INIT
     return 0
   end
 
@@ -1377,16 +1386,18 @@ local function run(event, touchState)
   drawMain()
 
   if state == STATE.SELECT_NA then
-    state_SELECT_FILE_init(event, touchState)
-    state = STATE.SELECT_FILE
+    state = STATE.SELECT_FILE_INIT
+    return 0
   end
 
-  if state == STATE.SELECT_FILE then
+  if state == STATE.SELECT_FILE_INIT then
+    return state_SELECT_FILE_init(event, touchState)
+  elseif state == STATE.SELECT_FILE then
     return state_SELECT_FILE_refresh(event, touchState)
   elseif state == STATE.READ_FILE_HEADER then
     return state_READ_FILE_HEADER_refresh(event, touchState)
-  --elseif state == STATE.SELECT_ACCURACY then
-  --  return state_SELECT_ACCURACY_refresh(event, touchState)
+  elseif state == STATE.SELECT_SENSORS_INIT then
+    return state_SELECT_SENSORS_INIT(event, touchState)
   elseif state == STATE.SELECT_SENSORS then
     return state_SELECT_SENSORS_refresh(event, touchState)
   elseif state == STATE.READ_FILE_DATA then
