@@ -44,6 +44,7 @@ local filename_idx = 1
 
 local columns = {}
 local current_session = nil
+local FIRST_VALID_COL = 2
 
 -- state machine
 local STATE = {
@@ -62,9 +63,11 @@ local STATE = {
 }
 
 local state = STATE.INIT
-local points = {}
-local conversionStep = 0
-local conversionIndex = 0
+--Graph data
+local _values = {}
+local _points = {}
+local conversionSensorId = 0
+local conversionSensorProgress = 0
 
 --File reading data
 local valPos = 0
@@ -84,9 +87,6 @@ local sensorSelection = {
     { y = 130, label = "Field 3", values = {}, value = 4, min = 0 },
     { y = 155, label = "Field 4", values = {}, value = 5, min = 0 }
 }
-
---Graph data
-local values = {}
 
 local graphConfig = {
     --x_start = 60,
@@ -204,7 +204,6 @@ local function split(text)
         result[cnt] = val
         cnt = cnt + 1
     end
-
     return result, cnt
 end
 
@@ -214,24 +213,6 @@ local function getTotalSeconds(time)
     total = total + tonumber(string.sub(time, 7, 8))
 
     return total
-end
-
-local function readHeader(file)
-    local read = io.read(file, 2048)
-    index = string.find(read, "\n")
-    if index ~= nil then
-        io.seek(file, index)
-        local headerLine = string.sub(read, 0, index - 1)
-        local columns_temp = split(headerLine)
-        columns[1] = "---"
-        for i = 2, #columns_temp, 1 do
-            local col = columns_temp[i]
-            columns[#columns + 1] = col
-        end
-        return true
-    end
-
-    return false
 end
 
 local function readFile()
@@ -313,13 +294,14 @@ local function collectData(file)
 
     for line in string_gmatch(buffer, "([^\n]+)\n") do
         if math_fmod(lines, skipLines) == 0 then
-            vals = split(line)
+            local vals = split(line)
+            --log2(string.format("collectData: 1: %s, 2: %s, 3: %s, 4: %s, line: %s", vals[1], vals[2], vals[3], vals[4], line))
 
             for varIndex = 1, 4, 1 do
-                if sensorSelection[varIndex].value ~= 0 then
-                    log2("collectData: varIndex: %d, value: %d", varIndex, sensorSelection[varIndex].value)
-                --if sensorSelection[varIndex].value ~= 0 and sensorSelection[varIndex].value ~= 1 then
-                    values[varIndex][valPos] = vals[sensorSelection[varIndex].value + 1]
+                if sensorSelection[varIndex].value >= FIRST_VALID_COL then
+                    local colId = sensorSelection[varIndex].value
+                    --log2(string.format("collectData: varIndex: %d, value: %d, %d", varIndex, sensorSelection[varIndex].value, vals[colId]))
+                    _values[varIndex][valPos] = vals[colId]
                 end
             end
 
@@ -343,7 +325,7 @@ local function collectData(file)
     return false
 end
 
-local function initFile()
+local function openFileAndReadHeader()
     if hFile ~= nil then
         io.close(hFile)
     end
@@ -353,267 +335,62 @@ local function initFile()
         return "Cannot open file?"
     end
 
-    if not readHeader(hFile) then
+    -- read Header
+    local read = io.read(hFile, 2048)
+    index = string.find(read, "\n")
+    if index == nil then
         return "Header could not be found"
     end
 
-    return nil
+    -- read columns
+    io.seek(hFile, index)
+    local headerLine = string.sub(read, 0, index - 1)
+    local columns_temp = split(headerLine)
+    columns[1] = "---"
+    for i = 2, #columns_temp, 1 do
+        local col = columns_temp[i]
+        columns[#columns + 1] = col
+    end
+
+    return nil -- no error
 end
 
-local function drawMain()
-    lcd.clear()
+--local function drawOption(y, label, value, select_index)
+--    --log1("drawOption: %s", label)
+--    local activeOption = current_option == select_index
+--    local w, h = lcd.sizeText(value)
+--
+--    -- draw label
+--    --log1("drawOption: %s", label)
+--    lcd.drawText(10, y, label, TEXT_COLOR)
+--
+--    -- draw value
+--    lcd.drawRectangle(100, y, w + 20, 20, COLOR_THEME_SECONDARY2)
+--    if activeOption then
+--        --lcd.drawText(100, y, value, TEXT_INVERTED_COLOR + INVERS)
+--        lcd.drawFilledRectangle(100, y, w + 20, 20, COLOR_THEME_FOCUS)
+--        lcd.drawText(100 + 5, y, value, COLOR_THEME_PRIMARY2)
+--    else
+--        lcd.drawText(100 + 5, y, value, TEXT_COLOR)
+--    end
+--end
 
-    -- draw background
-    --lcd.drawFilledRectangle(0, 0, LCD_W, LCD_H, COLOR_THEME_SECONDARY3)
-    if state ~= STATE.SHOW_GRAPH then
-        lcd.drawFilledRectangle(0, 0, LCD_W, LCD_H, WHITE)
-    else
-        lcd.drawFilledRectangle(0, 0, LCD_W, LCD_H, BLACK)
-    end
+--local function drawOptions(options)
+--    if current_option > #options then
+--        current_option = #options
+--    end
+--
+--    for i = 1, #options, 1 do
+--        option = options[i]
+--        if option.value > #option.values then
+--            option.value = #option.values
+--        elseif option.value < option.min then
+--            option.value = option.min
+--        end
+--        drawOption(option.y, option.label, option.values[option.value], i)
+--    end
+--end
 
-    -- draw top-bar
-    lcd.drawFilledRectangle(0, 0, LCD_W, 20, TITLE_BGCOLOR)
-    lcd.setColor(CUSTOM_COLOR, lcd.RGB(193, 198, 215))
-    --lcd.drawFilledRectangle(0, 0, LCD_W, 20, CUSTOM_COLOR) --"#BDC2D3"
-    --lcd.drawFilledRectangle(0, 0, LCD_W, 20, BLACK) --"#BDC2D3"
-    --lcd.drawFilledRectangle(0, 0, LCD_W, 20, COLOR_THEME_PRIMARY3)
-
-    if filename ~= nil then
-        --lcd.setColor(CUSTOM_COLOR, lcd.RGB(93,130,244))
-        --lcd.drawText(30, 1, "/LOGS/" .. filename, CUSTOM_COLOR + SMLSIZE)
-        lcd.drawText(30, 1, "/LOGS/" .. filename, WHITE + SMLSIZE)
-        --lcd.drawText(8, 1, "/LOGS/" .. filename, MENU_TITLE_COLOR + SMLSIZE)
-    end
-end
-
-local function drawOption(y, label, value, select_index)
-    --log1("drawOption: %s", label)
-    local activeOption = current_option == select_index
-    local w, h = lcd.sizeText(value)
-
-    -- draw label
-    --log1("drawOption: %s", label)
-    lcd.drawText(10, y, label, TEXT_COLOR)
-
-    -- draw value
-    lcd.drawRectangle(100, y, w + 20, 20, COLOR_THEME_SECONDARY2)
-    if activeOption then
-        --lcd.drawText(100, y, value, TEXT_INVERTED_COLOR + INVERS)
-        lcd.drawFilledRectangle(100, y, w + 20, 20, COLOR_THEME_FOCUS)
-        lcd.drawText(100 + 5, y, value, COLOR_THEME_PRIMARY2)
-    else
-        lcd.drawText(100 + 5, y, value, TEXT_COLOR)
-    end
-end
-
-local function drawOptions(options)
-    if current_option > #options then
-        current_option = #options
-    end
-
-    for i = 1, #options, 1 do
-        option = options[i]
-        if option.value > #option.values then
-            option.value = #option.values
-        elseif option.value < option.min then
-            option.value = option.min
-        end
-        drawOption(option.y, option.label, option.values[option.value], i)
-    end
-end
-
-local function handleOptionInput(options, event)
-    if event == EVT_VIRTUAL_NEXT_PAGE then
-        current_option = current_option + 1
-    elseif event == EVT_VIRTUAL_PREV_PAGE then
-        current_option = current_option - 1
-    end
-
-    if current_option < 1 then
-        current_option = 1
-    elseif current_option > #options then
-        current_option = #options
-    end
-
-    option = options[current_option]
-
-    --if event == EVT_PLUS_FIRST or event == EVT_ROT_RIGHT or event == EVT_PLUS_REPT or event == EVT_VIRTUAL_NEXT_REPT then
-    if event == EVT_VIRTUAL_NEXT then
-        option.value = option.value + 1
-        --elseif event == EVT_MINUS_FIRST or event == EVT_ROT_LEFT or event == EVT_MINUS_REPT then
-    elseif event == EVT_VIRTUAL_PREV then
-        option.value = option.value - 1
-    end
-
-    local maxOption = #option.values
-
-    if option.max ~= nil then
-        maxOption = option.max
-    end
-
-    if option.value < option.min then
-        option.value = option.min
-    elseif option.value > maxOption then
-        option.value = maxOption
-    end
-end
-
-local function drawGraph_base()
-    --lcd.drawLine(graphConfig.x_start, graphConfig.y_start, graphConfig.x_start, graphConfig.y_end, SOLID, CUSTOM_COLOR)
-    --lcd.drawLine(graphConfig.x_start, graphConfig.y_end, graphConfig.x_end, graphConfig.y_end, SOLID, CUSTOM_COLOR)
-    --lcd.drawLine(graphConfig.x_end, graphConfig.y_start, graphConfig.x_end, graphConfig.y_end, SOLID, CUSTOM_COLOR)
-    --lcd.drawLine(graphConfig.x_start, graphConfig.y_start, graphConfig.x_end, graphConfig.y_start, DOTTED, CUSTOM_COLOR)
-
-    local mode_x = 390
-    local mode_y = 1
-    local txt = nil
-    if graphMode == GRAPH_CURSOR then
-        txt = "Cursor"
-    elseif graphMode == GRAPH_ZOOM then
-        txt = "Zoom"
-    elseif graphMode == GRAPH_MINMAX then
-        txt = "min/max"
-    else
-        txt = "Scroll"
-    end
-    lcd.drawFilledRectangle(mode_x, mode_y, 100, 18, DARKGREEN)
-    --local mode_style = SMLSIZE + TEXT_INVERTED_COLOR + INVERS
-    lcd.drawText(mode_x, mode_y, "Mode: " .. txt, SMLSIZE + WHITE)
-end
-
-local function drawGraph_points(points, min, max)
-    if min == max then
-        return
-    end
-
-    local yScale = (max - min) / 200
-
-    prevY = graphConfig.y_end - ((points[0] - min) / yScale)
-
-    if prevY > graphConfig.y_end then
-        prevY = graphConfig.y_end
-    elseif prevY < graphConfig.y_start then
-        prevY = graphConfig.y_start
-    end
-
-    for i = 0, #points - 1, 1 do
-        x1 = graphConfig.x_start + (xStep * i)
-        y = graphConfig.y_end - ((points[i + 1] - min) / yScale)
-
-        if y > graphConfig.y_end then
-            y = graphConfig.y_end
-        elseif y < graphConfig.y_start then
-            y = graphConfig.y_start
-        end
-
-        lcd.drawLine(x1, prevY, x1 + xStep, y, SOLID, CUSTOM_COLOR)
-
-        prevY = y
-    end
-end
-
-local function drawGraph()
-    skip = graphSize / 101
-
-    lcd.setColor(CUSTOM_COLOR, BLACK)
-    drawGraph_base()
-
-    -- draw cursor
-    local x = graphConfig.x_start + (xStep * cursor)
-    lcd.drawLine(x, graphConfig.y_start, x, graphConfig.y_end, DOTTED, WHITE)
-
-    local cursorLine = math_floor((graphStart + (cursor * skip)) / graphTimeBase)
-    local cursorTime = toDuration1(cursorLine)
-
-    if cursorLine < 3600 then
-        cursorTime = string.sub(cursorTime, 4)
-    end
-
-    -- draw cursor time
-    --lcd.drawText(5, 130, cursorTime, CUSTOM_COLOR)
-    lcd.drawText(x, 20, cursorTime, WHITE)
-
-    --Draw session view locations
-    local viewScale = valPos / 479
-    local viewStart = math.floor(graphStart / viewScale)
-    local viewEnd = math.floor((graphStart + graphSize) / viewScale)
-
-    lcd.setColor(CUSTOM_COLOR, RED)
-
-    lcd.drawLine(viewStart, 269, viewEnd, 269, SOLID, CUSTOM_COLOR)
-    lcd.drawLine(viewStart, 270, viewEnd, 270, SOLID, CUSTOM_COLOR)
-    lcd.drawLine(viewStart, 271, viewEnd, 271, SOLID, CUSTOM_COLOR)
-
-    -- draw min/max
-    for varIndex = 1, 4, 1 do
-        if sensorSelection[varIndex].value ~= 0 then
-            local points = points[varIndex]
-            local cfg = graphConfig[varIndex]
-
-            if #points.points == 0 then
-                for i = 0, 100, 1 do
-                    --print("i:" .. i .. ", skip: " .. skip .. ", result:" .. math_floor(graphStart + (i * skip)))
-                    points.points[i] = values[varIndex][math_floor(graphStart + (i * skip))]
-                    if points.points[i] == nil then
-                        points.points[i] = 0
-                    end
-                end
-            end
-
-            lcd.setColor(CUSTOM_COLOR, cfg.color)
-            drawGraph_points(points.points, points.min, points.max)
-
-            local minPos = math_floor((points.minpos + 1 - graphStart) / skip)
-            local maxPos = math_floor((points.maxpos + 1 - graphStart) / skip)
-
-            if minPos < 0 then
-                minPos = 0
-            elseif minPos > 100 then
-                minPos = 100
-            end
-
-            if maxPos < 0 then
-                maxPos = 0
-            elseif maxPos > 100 then
-                maxPos = 100
-            end
-
-            local x = graphConfig.x_start + (minPos * xStep)
-            lcd.drawLine(x, 240, x, 250, SOLID, CUSTOM_COLOR)
-
-            local x = graphConfig.x_start + (maxPos * xStep)
-            -- ??? graphConfig.y_end
-            lcd.drawLine(x, 30, x, graphConfig.y_start, SOLID, CUSTOM_COLOR)
-
-            -- draw max
-            if graphMode == GRAPH_MINMAX and graphMinMaxIndex == (varIndex - 1) * 2 then
-                local txt = string.format("Max: %d", points.max)
-                local w, h = lcd.sizeText(txt, MIDSIZE)
-                lcd.drawFilledRectangle(cfg.maxx, cfg.maxy, w + 4, h, GREY, 3)
-                lcd.drawRectangle(cfg.maxx, cfg.maxy, w + 4, h, CUSTOM_COLOR)
-                lcd.drawText(cfg.maxx, cfg.maxy, txt, MIDSIZE + CUSTOM_COLOR)
-            else
-                lcd.drawText(cfg.maxx, cfg.maxy, points.max, SMLSIZE + CUSTOM_COLOR)
-            end
-
-            -- draw min
-            if graphMode == GRAPH_MINMAX and graphMinMaxIndex == ((varIndex - 1) * 2) + 1 then
-                local txt = string.format("Min: %d", points.min)
-                local w, h = lcd.sizeText(txt, MIDSIZE)
-                lcd.drawFilledRectangle(cfg.minx, cfg.miny, w + 4, h, GREY, 5)
-                lcd.drawRectangle(cfg.minx, cfg.miny, w + 4, h, CUSTOM_COLOR)
-                lcd.drawText(cfg.minx, cfg.miny, txt, MIDSIZE + CUSTOM_COLOR)
-                --lcd.drawText(cfg.minx, cfg.miny, points.min, MIDSIZE + TEXT_INVERTED_COLOR + INVERS)
-            else
-                lcd.drawText(cfg.minx, cfg.miny, points.min, SMLSIZE + CUSTOM_COLOR)
-            end
-
-            if points.points[cursor] ~= nil then
-                lcd.drawText(cfg.valx, cfg.valy, points.name .. " " .. points.points[cursor], CUSTOM_COLOR)
-            end
-        end
-    end
-end
 
 local function print_table(prefix, tbl)
     for i = 1, #tbl, 1 do
@@ -621,7 +398,6 @@ local function print_table(prefix, tbl)
         log(string.format("%d. %s: %s", i, prefix, val))
     end
 end
-
 
 local function compare_file_names(a, b)
     a1 = string.sub(a, -21, -5)
@@ -648,7 +424,7 @@ local function read_files_list()
         for fn in dir("/LOGS") do
             --print_table("log_file_list_raw", log_file_list_raw)
             log1("fn: %s", fn)
-            log_file_list_raw[log_file_list_raw_idx+1] = fn
+            log_file_list_raw[log_file_list_raw_idx + 1] = fn
             log_file_list_raw_idx = log_file_list_raw_idx + 1
         end
         --log1("1 log_file_list_raw: %s", log_file_list_raw)
@@ -657,13 +433,13 @@ local function read_files_list()
     end
 
     math.min(10, #log_file_list_raw - log_file_list_raw_idx)
-    for i=1, 10, 1 do
+    for i = 1, 10, 1 do
         log_file_list_raw_idx = log_file_list_raw_idx + 1
         local fileName = log_file_list_raw[log_file_list_raw_idx]
         log3("log file: (%d/%d) %s (detecting...)", log_file_list_raw_idx, #log_file_list_raw, fileName)
 
         -- F3A UNI recorde-2022-02-09-082937.csv
-        local modelName, year, month, day, hour, min, sec, m, d, y = string.match(fileName, "(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv")
+        local modelName, year, month, day, hour, min, sec, m, d, y = string.match(fileName, "^(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv$")
         if modelName ~= nil then
             --log1("log file: %s (is csv)", fileName)
             log(string.format("modelName:%s, day:%s, month:%s, year:%s, hour:%s, min:%s, sec:%s", modelName, day, month, year, hour, min, sec))
@@ -853,7 +629,6 @@ local function state_SELECT_SENSORS_INIT(event, touchState)
 
     end
 
-
     state = STATE.SELECT_SENSORS
     return 0
 end
@@ -868,13 +643,12 @@ local function state_SELECT_FILE_refresh(event, touchState)
         heap = 2048 * 12
         prevTotalSeconds = 0
 
-        local fileResult = initFile()
+        local fileResult = openFileAndReadHeader()
         if fileResult ~= nil then
-            log("error initFile()")
+            log1("ERROR: openFileAndReadHeader() \n%s", fileResult)
             error(fileResult)
         end
 
-        log("111")
         state = STATE.READ_FILE_HEADER
         return 0
     end
@@ -953,13 +727,13 @@ local function state_SELECT_SENSORS_refresh(event, touchState)
         --maxLines = current_session.total_lines - current_session.startLine
         log(string.format("current_session.total_lines: %d", current_session.total_lines))
 
-        points = {}
-        values = {}
+        _points = {}
+        _values = {}
 
         for varIndex = 1, 4, 1 do
-            if sensorSelection[varIndex].value ~= 0 then
-                points[varIndex] = {}
-                values[varIndex] = {}
+            if sensorSelection[varIndex].value >= 2 then
+                _points[varIndex] = {}
+                _values[varIndex] = {}
             end
         end
 
@@ -967,42 +741,8 @@ local function state_SELECT_SENSORS_refresh(event, touchState)
         return 0
     end
 
-    --lcd.drawText(5, 25, "Select vars to display on graph...", TEXT_COLOR)
-    --
-    --drawOptions(sensorSelection)
-    --handleOptionInput(sensorSelection, event)
-    --
-    --local duration = toDuration2(getTotalSeconds(current_session.endTime) - getTotalSeconds(current_session.startTime))
-    --lcd.drawText(340, 200, string.format("time: %s", current_session.startTime), TEXT_COLOR)
-    --lcd.drawText(340, 220, string.format("duration: %s", duration), TEXT_COLOR)
-    ----lcd.drawText(100, 100, string.format("Duration %s (%d lines)", duration, lines), TEXT_COLOR)
-    --lcd.drawText(340, 240, string.format("lines: %d", lines), TEXT_COLOR)
-
     ctx2.run(event, touchState)
 
-
-    ---- draw sensor grid
-    --local x = 10
-    --local y = 50
-    --local dx = 80
-    --local dy = 25
-    --local iCol = 2
-    --for iy = 0, 10, 1 do
-    --    for ix = 0, 5, 1 do
-    --        if iCol < #columns then
-    --
-    --            local col_name = columns[iCol]
-    --            log1("col: %s", columns[i])
-    --
-    --            lcd.drawFilledRectangle(x + dx * ix, y + dy * iy, 50, 16, TEXT_INVERTED_BGCOLOR)
-    --            lcd.drawRectangle(x + dx * ix, y + dy * iy, 50, 20, TEXT_COLOR)
-    --
-    --            lcd.drawText(x + dx * ix + 5, y + dy * iy, col_name, SMLSIZE + TEXT_COLOR)
-    --            iCol = iCol +1
-    --        end
-    --    end
-    --
-    --end
 
     ---- draw sensor grid
     --local x = 200
@@ -1013,13 +753,10 @@ local function state_SELECT_SENSORS_refresh(event, touchState)
     --local ix = 0
     --for iy = 0, 10, 1 do
     --    if iCol < #columns then
-    --
     --        local col_name = columns[iCol]
     --        log1("col: %s", columns[i])
-    --
     --        lcd.drawFilledRectangle(x + dx * ix, y + dy * iy, 100, 20, TEXT_INVERTED_BGCOLOR)
     --        lcd.drawRectangle(x + dx * ix, y + dy * iy, 100, 20, TEXT_COLOR)
-    --
     --        lcd.drawText(x + dx * ix + 5, y + dy * iy, col_name, SMLSIZE + TEXT_COLOR)
     --        iCol = iCol +1
     --    end
@@ -1038,15 +775,15 @@ local function state_SELECT_SENSORS_refresh(event, touchState)
 end
 
 local function drawProgress(y, current, total)
-    log2(string.format("drawProgress(%d. %d, %d)", y, current, total))
+    --log2(string.format("drawProgress(%d. %d, %d)", y, current, total))
     local x = 140
     local pct = current / total
     lcd.drawFilledRectangle(x + 1, y + 1, (470 - x - 2) * pct, 14, TEXT_INVERTED_BGCOLOR)
     lcd.drawRectangle(x, y, 470 - x, 16, TEXT_COLOR)
 end
 
-local function display_read_data(conversionStep, conversionIndex)
-    log2("display_read_data(%d, %d)", conversionStep, conversionIndex)
+local function display_read_data_progress(conversionSensorId, conversionSensorProgress)
+    --log2("display_read_data_progress(%d, %d)", conversionSensorId, conversionSensorProgress)
     lcd.drawText(5, 25, "Reading data from file...", TEXT_COLOR)
 
     lcd.drawText(5, 60, "Reading line: " .. lines, TEXT_COLOR)
@@ -1056,23 +793,23 @@ local function display_read_data(conversionStep, conversionIndex)
     local done_var_2 = 0
     local done_var_3 = 0
     local done_var_4 = 0
-    if conversionStep == 1 then
-        done_var_1 = conversionIndex
+    if conversionSensorId == 1 then
+        done_var_1 = conversionSensorProgress
     end
-    if conversionStep == 2 then
+    if conversionSensorId == 2 then
         done_var_1 = valPos
-        done_var_2 = conversionIndex
+        done_var_2 = conversionSensorProgress
     end
-    if conversionStep == 3 then
+    if conversionSensorId == 3 then
         done_var_1 = valPos
         done_var_2 = valPos
-        done_var_3 = conversionIndex
+        done_var_3 = conversionSensorProgress
     end
-    if conversionStep == 4 then
+    if conversionSensorId == 4 then
         done_var_1 = valPos
         done_var_2 = valPos
         done_var_3 = valPos
-        done_var_4 = conversionIndex
+        done_var_4 = conversionSensorProgress
     end
     local y = 85
     local dy = 25
@@ -1096,10 +833,11 @@ local function state_READ_FILE_DATA_refresh(event, touchState)
         return 0
     end
 
-    display_read_data(0, 0)
+    display_read_data_progress(0, 0)
 
-    if collectData(hFile) then
-        conversionStep = 0
+    local is_done = collectData(hFile)
+    if is_done then
+        conversionSensorId = 0
         state = STATE.PARSE_DATA
     end
 
@@ -1115,75 +853,104 @@ local function state_PARSE_DATA_refresh(event, touchState)
         return 0
     end
 
-    display_read_data(conversionStep, conversionIndex)
-
-    --lcd.drawText(5,110, "Parsing data", TEXT_COLOR)
-    --lcd.drawText(5,120, "Almost ready :)", TEXT_COLOR)
-
-    --if conversionStep ~= 0 then
-    --    lcd.drawText(5, 80, "Parsing Var " .. conversionStep, TEXT_COLOR)
-    --    drawProgress(120, conversionIndex, valPos)
-    --end
+    display_read_data_progress(conversionSensorId, conversionSensorProgress)
 
     local cnt = 0
-    if conversionStep == 0 then
-        conversionStep = 1
-        conversionIndex = 0
 
-        graphTimeBase = valPos / (getTotalSeconds(current_session.endTime) - getTotalSeconds(current_session.startTime))
+    -- prepare
+    if conversionSensorId == 0 then
+        conversionSensorId = 1
+        conversionSensorProgress = 0
+        local fileTime = getTotalSeconds(current_session.endTime) - getTotalSeconds(current_session.startTime)
+        graphTimeBase = valPos / fileTime
 
         for varIndex = 1, 4, 1 do
-            if sensorSelection[varIndex].value ~= 0 then
+            if sensorSelection[varIndex].value >= FIRST_VALID_COL then
                 local columnName = columns[sensorSelection[varIndex].value]
+                -- remove column units if exist
                 local i = string.find(columnName, "%(")
+                local unit = string.sub(columnName, i + 1, #columnName - 1)
+                --log2("read-header: %d, %s", i, unit)
 
                 if i ~= nil then
                     columnName = string.sub(columnName, 0, i - 1)
                 end
-
-                points[varIndex] = { min = 9999, max = -9999, minpos = 0, maxpos = 0, points = {}, name = columnName }
+                --log2("state_PARSE_DATA_refresh: col-name: %d. %s", varIndex, columnName)
+                _points[varIndex] = {
+                    min = 9999,
+                    max = -9999,
+                    minpos = 0,
+                    maxpos = 0,
+                    points = {},
+                    name = columnName,
+                    unit = unit
+                }
             end
         end
-    else
-        if sensorSelection[conversionStep].value ~= 0 then
-            for i = conversionIndex, valPos - 1, 1 do
+        return 0
+    end
 
-                val = tonumber(values[conversionStep][i])
-                values[conversionStep][i] = val
-                conversionIndex = conversionIndex + 1
-                cnt = cnt + 1
+    --
+    if sensorSelection[conversionSensorId].value >= FIRST_VALID_COL then
+        for i = conversionSensorProgress, valPos - 1, 1 do
+            local val = tonumber(_values[conversionSensorId][i])
+            _values[conversionSensorId][i] = val
+            conversionSensorProgress = conversionSensorProgress + 1
+            cnt = cnt + 1
+            --log(string.format("PARSE_DATA: %d.%s %d min:%d max:%d", conversionSensorId, _points[conversionSensorId].name, #_points[conversionSensorId].points, _points[conversionSensorId].min, _points[conversionSensorId].max))
 
-                log1("conversionStep: %s", conversionStep)
-                log2("points[%d] = %s", conversionStep, points[conversionStep])
-                --log2("points[0].max: %s", points[0].max)
-                log2("points[].max: %s", points[conversionStep].max)
-                if val > points[conversionStep].max then
-                    points[conversionStep].max = val
-                    points[conversionStep].maxpos = i
-                elseif val < points[conversionStep].min then
-                    points[conversionStep].min = val
-                    points[conversionStep].minpos = i
-                end
-
-                if cnt > 100 then
-                    return 0
-                end
+            if val > _points[conversionSensorId].max then
+                _points[conversionSensorId].max = val
+                _points[conversionSensorId].maxpos = i
+            elseif val < _points[conversionSensorId].min then
+                _points[conversionSensorId].min = val
+                _points[conversionSensorId].minpos = i
             end
-        end
 
-        if conversionStep == 4 then
-            graphStart = 0
-            graphSize = valPos
-            cursor = 0
-            graphMode = GRAPH_CURSOR
-            state = STATE.SHOW_GRAPH
-        else
-            conversionIndex = 0
-            conversionStep = conversionStep + 1
+            if cnt > 100 then
+                return 0
+            end
         end
     end
 
+    if conversionSensorId == 4 then
+        graphStart = 0
+        graphSize = valPos
+        cursor = 50
+        graphMode = GRAPH_CURSOR
+        state = STATE.SHOW_GRAPH
+    else
+        conversionSensorProgress = 0
+        conversionSensorId = conversionSensorId + 1
+    end
+
     return 0
+end
+
+local function drawMain()
+    lcd.clear()
+
+    -- draw background
+    --lcd.drawFilledRectangle(0, 0, LCD_W, LCD_H, COLOR_THEME_SECONDARY3)
+    if state ~= STATE.SHOW_GRAPH then
+        lcd.drawFilledRectangle(0, 0, LCD_W, LCD_H, WHITE)
+    else
+        lcd.drawFilledRectangle(0, 0, LCD_W, LCD_H, BLACK)
+    end
+
+    -- draw top-bar
+    lcd.drawFilledRectangle(0, 0, LCD_W, 20, TITLE_BGCOLOR)
+    lcd.setColor(CUSTOM_COLOR, lcd.RGB(193, 198, 215))
+    --lcd.drawFilledRectangle(0, 0, LCD_W, 20, CUSTOM_COLOR) --"#BDC2D3"
+    --lcd.drawFilledRectangle(0, 0, LCD_W, 20, BLACK) --"#BDC2D3"
+    --lcd.drawFilledRectangle(0, 0, LCD_W, 20, COLOR_THEME_PRIMARY3)
+
+    if filename ~= nil then
+        --lcd.setColor(CUSTOM_COLOR, lcd.RGB(93,130,244))
+        --lcd.drawText(30, 1, "/LOGS/" .. filename, CUSTOM_COLOR + SMLSIZE)
+        lcd.drawText(30, 1, "/LOGS/" .. filename, WHITE + SMLSIZE)
+        --lcd.drawText(8, 1, "/LOGS/" .. filename, MENU_TITLE_COLOR + SMLSIZE)
+    end
 end
 
 local function run_GRAPH_Adjust(amount, mode)
@@ -1201,7 +968,7 @@ local function run_GRAPH_Adjust(amount, mode)
             amount = -4
         end
 
-        local oldgraphSize = graphSize
+        local oldGraphSize = graphSize
         graphSize = math.floor(graphSize / (1 + (amount * 0.2)))
 
         if graphSize < 101 then
@@ -1217,7 +984,7 @@ local function run_GRAPH_Adjust(amount, mode)
                 graphStart = valPos - graphSize
             end
         else
-            local delta = oldgraphSize - graphSize
+            local delta = oldGraphSize - graphSize
             graphStart = graphStart + math_floor((delta * (cursor / 100)))
 
             if graphStart < 0 then
@@ -1230,12 +997,12 @@ local function run_GRAPH_Adjust(amount, mode)
         graphSize = math_floor(graphSize)
 
         for varIndex = 1, 4, 1 do
-            if sensorSelection[varIndex].value ~= 0 then
-                points[varIndex].points = {}
+            if sensorSelection[varIndex].value >= FIRST_VALID_COL then
+                _points[varIndex].points = {}
             end
         end
     elseif mode == GRAPH_MINMAX then
-        local point = points[(math.floor(graphMinMaxIndex / 2)) + 1]
+        local point = _points[(math.floor(graphMinMaxIndex / 2)) + 1]
 
         local delta = math.floor((point.max - point.min) / 50 * amount)
 
@@ -1270,8 +1037,164 @@ local function run_GRAPH_Adjust(amount, mode)
         graphStart = math_floor(graphStart)
 
         for varIndex = 1, 4, 1 do
-            if sensorSelection[varIndex].value ~= 0 then
-                points[varIndex].points = {}
+            if sensorSelection[varIndex].value >= FIRST_VALID_COL then
+                _points[varIndex].points = {}
+            end
+        end
+    end
+end
+
+local function drawGraph_base()
+    --lcd.drawLine(graphConfig.x_start, graphConfig.y_start, graphConfig.x_start, graphConfig.y_end, SOLID, CUSTOM_COLOR)
+    --lcd.drawLine(graphConfig.x_start, graphConfig.y_end, graphConfig.x_end, graphConfig.y_end, SOLID, CUSTOM_COLOR)
+    --lcd.drawLine(graphConfig.x_end, graphConfig.y_start, graphConfig.x_end, graphConfig.y_end, SOLID, CUSTOM_COLOR)
+    --lcd.drawLine(graphConfig.x_start, graphConfig.y_start, graphConfig.x_end, graphConfig.y_start, DOTTED, CUSTOM_COLOR)
+
+    local mode_x = 390
+    local mode_y = 1
+    local txt = nil
+    if graphMode == GRAPH_CURSOR then
+        txt = "Cursor"
+    elseif graphMode == GRAPH_ZOOM then
+        txt = "Zoom"
+    elseif graphMode == GRAPH_MINMAX then
+        txt = "min/max"
+    else
+        txt = "Scroll"
+    end
+    lcd.drawFilledRectangle(mode_x, mode_y, 100, 18, DARKGREEN)
+    --local mode_style = SMLSIZE + TEXT_INVERTED_COLOR + INVERS
+    lcd.drawText(mode_x, mode_y, "Mode: " .. txt, SMLSIZE + WHITE)
+end
+
+local function drawGraph_points(points, min, max)
+    if min == max then
+        return
+    end
+
+    local yScale = (max - min) / 200
+    local prevY = graphConfig.y_end - ((points[0] - min) / yScale)
+    prevY = math.min(math.max(prevY, graphConfig.y_start), graphConfig.y_end)
+    --if prevY > graphConfig.y_end then
+    --    prevY = graphConfig.y_end
+    --elseif prevY < graphConfig.y_start then
+    --    prevY = graphConfig.y_start
+    --end
+
+    for i = 0, #points - 1, 1 do
+        local x1 = graphConfig.x_start + (xStep * i)
+        local y = graphConfig.y_end - ((points[i + 1] - min) / yScale)
+
+        y = math.min(math.max(y, graphConfig.y_start), graphConfig.y_end)
+        --if y > graphConfig.y_end then
+        --    y = graphConfig.y_end
+        --elseif y < graphConfig.y_start then
+        --    y = graphConfig.y_start
+        --end
+
+        lcd.drawLine(x1, prevY, x1 + xStep, y, SOLID, CUSTOM_COLOR)
+        prevY = y
+    end
+end
+
+local function drawGraph()
+    local skip = graphSize / 101
+
+    lcd.setColor(CUSTOM_COLOR, BLACK)
+    drawGraph_base()
+
+    -- draw cursor
+    local cursor_x = graphConfig.x_start + (xStep * cursor)
+    lcd.drawLine(cursor_x, graphConfig.y_start, cursor_x, graphConfig.y_end, DOTTED, WHITE)
+
+    local cursorLine = math_floor((graphStart + (cursor * skip)) / graphTimeBase)
+    local cursorTime = toDuration1(cursorLine)
+
+    if cursorLine < 3600 then
+        cursorTime = string.sub(cursorTime, 4)
+    end
+
+    -- draw cursor time
+    lcd.drawText(cursor_x, 20, cursorTime, WHITE)
+
+    -- draw bottom session line
+    local viewScale = valPos / 479
+    local viewStart = math.floor(graphStart / viewScale)
+    local viewEnd = math.floor((graphStart + graphSize) / viewScale)
+    lcd.drawLine(viewStart, 269, viewEnd, 269, SOLID, RED)
+    lcd.drawLine(viewStart, 270, viewEnd, 270, SOLID, RED)
+    lcd.drawLine(viewStart, 271, viewEnd, 271, SOLID, RED)
+
+    -- draw all lines
+    for varIndex = 1, 4, 1 do
+        if (sensorSelection[varIndex].value >= FIRST_VALID_COL) and (_points[varIndex].min~=0 or _points[varIndex].max ~=0)  then
+            local varPoints = _points[varIndex]
+            local varCfg = graphConfig[varIndex]
+            --log(string.format("drawGraph: %d.%s %d min:%d max:%d", varIndex, varPoints.name, #varPoints.points, varPoints.min, varPoints.max))
+            --log2("drawGraph: %d. %s", varIndex, varPoints.columnName)
+            if #varPoints.points == 0 then
+                for i = 0, 100, 1 do
+                    --print("i:" .. i .. ", skip: " .. skip .. ", result:" .. math_floor(graphStart + (i * skip)))
+                    varPoints.points[i] = _values[varIndex][math_floor(graphStart + (i * skip))]
+                    if varPoints.points[i] == nil then
+                        varPoints.points[i] = 0
+                    end
+                end
+            end
+
+            -- points
+            lcd.setColor(CUSTOM_COLOR, varCfg.color)
+            drawGraph_points(varPoints.points, varPoints.min, varPoints.max)
+
+            -- draw min/max
+            local minPos = math_floor((varPoints.minpos + 1 - graphStart) / skip)
+            local maxPos = math_floor((varPoints.maxpos + 1 - graphStart) / skip)
+            minPos = math.min(math.max(minPos, 0), 100)
+            maxPos = math.min(math.max(maxPos, 0), 100)
+
+            local x = graphConfig.x_start + (minPos * xStep)
+            lcd.drawLine(x, 240, x, 250, SOLID, CUSTOM_COLOR)
+
+            local x = graphConfig.x_start + (maxPos * xStep)
+            lcd.drawLine(x, 30, x, graphConfig.y_start, SOLID, CUSTOM_COLOR)
+
+            -- draw max
+            if graphMode == GRAPH_MINMAX and graphMinMaxIndex == (varIndex - 1) * 2 then
+                local txt = string.format("Max: %d", varPoints.max)
+                local w, h = lcd.sizeText(txt, MIDSIZE)
+                lcd.drawFilledRectangle(varCfg.maxx, varCfg.maxy, w + 4, h, GREY, 3)
+                lcd.drawRectangle(varCfg.maxx, varCfg.maxy, w + 4, h, CUSTOM_COLOR)
+                lcd.drawText(varCfg.maxx, varCfg.maxy, txt, MIDSIZE + CUSTOM_COLOR)
+            else
+                lcd.drawFilledRectangle(varCfg.maxx - 5, varCfg.maxy, 35, 14, GREY, 5)
+                lcd.drawText(varCfg.maxx, varCfg.maxy, varPoints.max, SMLSIZE + CUSTOM_COLOR)
+            end
+
+            -- draw min
+            if graphMode == GRAPH_MINMAX and graphMinMaxIndex == ((varIndex - 1) * 2) + 1 then
+                local txt = string.format("Min: %d", varPoints.min)
+                local w, h = lcd.sizeText(txt, MIDSIZE)
+                lcd.drawFilledRectangle(varCfg.minx, varCfg.miny, w + 4, h, GREY, 5)
+                lcd.drawRectangle(varCfg.minx, varCfg.miny, w + 4, h, CUSTOM_COLOR)
+                lcd.drawText(varCfg.minx, varCfg.miny, txt, MIDSIZE + CUSTOM_COLOR)
+                --lcd.drawText(cfg.minx, cfg.miny, points.min, MIDSIZE + TEXT_INVERTED_COLOR + INVERS)
+            else
+                lcd.drawFilledRectangle(varCfg.minx - 5, varCfg.miny, 35, 14, GREY, 5)
+                lcd.drawText(varCfg.minx, varCfg.miny, varPoints.min, SMLSIZE + CUSTOM_COLOR)
+            end
+
+            -- col-name and value at cursor
+            if varPoints.points[cursor] ~= nil then
+                lcd.drawText(varCfg.valx, varCfg.valy, varPoints.name .. "=" .. varPoints.points[cursor] .. varPoints.unit, CUSTOM_COLOR)
+
+                local yScale = (varPoints.max - varPoints.min) / 200
+                local cursor_y = graphConfig.y_end - ((varPoints.points[cursor] - varPoints.min) / yScale)
+                local x1 = cursor_x + 30
+                local y1 = 120 + 25 * varIndex
+                lcd.drawFilledRectangle(x1, y1, 40, 20, CUSTOM_COLOR)
+                lcd.drawLine(x1, y1 + 10, cursor_x, cursor_y, DOTTED, CUSTOM_COLOR)
+                lcd.drawFilledCircle(cursor_x, cursor_y, 4, CUSTOM_COLOR)
+                lcd.drawText(x1 + 40, y1, varPoints.points[cursor] .. varPoints.unit, BLACK + RIGHT)
             end
         end
     end
@@ -1365,7 +1288,7 @@ local function state_SHOW_GRAPH_refresh(event, touchState)
 
     adjust = getValue('ele') / 200
     if math.abs(adjust) > 0.5 then
-        run_GRAPH_Adjust( - adjust, GRAPH_ZOOM)
+        run_GRAPH_Adjust(-adjust, GRAPH_ZOOM)
     end
 
     --adjust = getValue('jsy') / 200
