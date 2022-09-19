@@ -1,3 +1,5 @@
+local toolName = "TNS|Log Viewer v0.1|TNE"
+
 ---- #########################################################################
 ---- #                                                                       #
 ---- # License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html               #
@@ -18,7 +20,6 @@
 -- Current Author: Offer Shmuely
 -- Date: 2022
 -- ver: 0.1
-
 
 
 --function cache
