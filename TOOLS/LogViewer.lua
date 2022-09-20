@@ -1,4 +1,4 @@
-local toolName = "TNS|Log Viewer v0.1|TNE"
+local toolName = "TNS|Log Viewer v0.2|TNE"
 
 ---- #########################################################################
 ---- #                                                                       #
@@ -19,7 +19,7 @@ local toolName = "TNS|Log Viewer v0.1|TNE"
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2022
--- ver: 0.1
+-- ver: 0.2
 
 
 --function cache
@@ -35,11 +35,15 @@ local hFile
 local log_file_list_raw = {}
 local log_file_list_raw_idx = -1
 local log_file_list = {}
+
+local log_file_list_filtered = {}
 local filter_model_name
 local filter_date
-local model_name_list = { "-- all -- (not working yet)" }
-local date_list = { "-- all -- (not working yet)" }
+local model_name_list = { "-- all --" }
+local date_list = { "-- all --" }
 local accuracy_list = { "1/1 (read every line)", "1/2 (every 2nd line)", "1/5 (every 5th line)", "1/10 (every 10th line)" }
+local ddLogFile = nil -- log-file dropDown object
+
 local filename
 local filename_idx = 1
 
@@ -165,6 +169,20 @@ function tprint (t, s)
             end
             print(type(t) .. (s or '') .. kfmt .. ' = ' .. vfmt)
         end
+    end
+end
+
+local function table_clear(tbl)
+    -- clean without creating a new list
+    for i = 0, #tbl do
+        table.remove(tbl, 1)
+    end
+end
+
+local function table_print(prefix, tbl)
+    for i = 1, #tbl, 1 do
+        local val = tbl[i]
+        log(string.format("%d. %s: %s", i, prefix, val))
     end
 end
 
@@ -347,6 +365,7 @@ local function openFileAndReadHeader()
     io.seek(hFile, index)
     local headerLine = string.sub(read, 0, index - 1)
     local columns_temp = split(headerLine)
+    table_clear(columns)
     columns[1] = "---"
     for i = 2, #columns_temp, 1 do
         local col = columns_temp[i]
@@ -356,62 +375,65 @@ local function openFileAndReadHeader()
     return nil -- no error
 end
 
---local function drawOption(y, label, value, select_index)
---    --log1("drawOption: %s", label)
---    local activeOption = current_option == select_index
---    local w, h = lcd.sizeText(value)
---
---    -- draw label
---    --log1("drawOption: %s", label)
---    lcd.drawText(10, y, label, TEXT_COLOR)
---
---    -- draw value
---    lcd.drawRectangle(100, y, w + 20, 20, COLOR_THEME_SECONDARY2)
---    if activeOption then
---        --lcd.drawText(100, y, value, TEXT_INVERTED_COLOR + INVERS)
---        lcd.drawFilledRectangle(100, y, w + 20, 20, COLOR_THEME_FOCUS)
---        lcd.drawText(100 + 5, y, value, COLOR_THEME_PRIMARY2)
---    else
---        lcd.drawText(100 + 5, y, value, TEXT_COLOR)
---    end
---end
-
---local function drawOptions(options)
---    if current_option > #options then
---        current_option = #options
---    end
---
---    for i = 1, #options, 1 do
---        option = options[i]
---        if option.value > #option.values then
---            option.value = #option.values
---        elseif option.value < option.min then
---            option.value = option.min
---        end
---        drawOption(option.y, option.label, option.values[option.value], i)
---    end
---end
-
-
-local function print_table(prefix, tbl)
-    for i = 1, #tbl, 1 do
-        local val = tbl[i]
-        log(string.format("%d. %s: %s", i, prefix, val))
-    end
-end
-
 local function compare_file_names(a, b)
     a1 = string.sub(a, -21, -5)
     b1 = string.sub(b, -21, -5)
     --log2("ab, %s ? %s", a, b)
-    --log1("a1, %s", a1)
-    --log1("b1, %s ", b1)
     --log2("a1b1, %s ? %s", a1, b1)
     return a1 > b1
 end
 
 local function compare_dates(a, b)
     return a > b
+end
+
+local function compare_names(a, b)
+    return a < b
+end
+
+local function list_ordered_insert2(lst, newVal, cmp, firstValAt)
+    -- remove duplication
+    for i = 1, #lst do
+        if lst[i] == newVal then
+            return
+        end
+    end
+
+    lst[#lst + 1] = newVal
+
+    -- sort
+    for i = #lst - 1, firstValAt, -1 do
+        if cmp(lst[i], lst[i + 1]) == false then
+            local tmp = lst[i]
+            lst[i] = lst[i + 1]
+            lst[i + 1] = tmp
+        end
+    end
+    --print("list_ordered_insert:----------------\n")
+    --print_table("list_ordered_insert", log_file_list)
+end
+
+local function list_ordered_insert(lst, newVal, cmp, firstValAt)
+    --print("list_ordered_insert:----------------\n")
+
+    -- sort
+    for i = firstValAt, #lst, 1 do
+        -- remove duplication
+        --log2("list_ordered_insert - %s ? %s",  newVal, lst[i] )
+        if newVal == lst[i] then
+            --print_table("list_ordered_insert - duplicated", lst)
+            return
+        end
+
+        if cmp(newVal, lst[i]) == true then
+            table.insert(lst, i, newVal)
+            --print_table("list_ordered_insert - inserted", lst)
+            return
+        end
+        --print_table("list_ordered_insert-loop", lst)
+    end
+    table.insert(lst, newVal)
+    --print_table("list_ordered_insert-inserted-to-end", lst)
 end
 
 -- read log file list
@@ -430,7 +452,7 @@ local function read_files_list()
         end
         --log1("1 log_file_list_raw: %s", log_file_list_raw)
         log_file_list_raw_idx = 0
-        print_table("log_file_list_raw", log_file_list_raw)
+        table_print("log_file_list_raw", log_file_list_raw)
     end
 
     math.min(10, #log_file_list_raw - log_file_list_raw_idx)
@@ -447,16 +469,16 @@ local function read_files_list()
 
             --log1("os.time", os.time{year=year, month=month, day=day, hour=hour, min=min, sec=sec})
 
-            log_file_list[#log_file_list + 1] = fileName
+            list_ordered_insert(log_file_list, fileName, compare_file_names, 1)
 
-            if model_name_list[#model_name_list] ~= modelName then
-                model_name_list[#model_name_list + 1] = modelName
-            end
+
+            --if model_name_list[#model_name_list] ~= modelName then
+            --    model_name_list[#model_name_list + 1] = modelName
+            --end
+            list_ordered_insert(model_name_list, modelName, compare_names, 2)
 
             local model_day = string.format("%s-%s-%s", year, month, day)
-            if date_list[#date_list] ~= model_day then
-                date_list[#date_list + 1] = model_day
-            end
+            list_ordered_insert(date_list, model_day, compare_dates, 2)
 
             --local file = io.open("/LOGS/" .. fileName, "r")
             --if file ~= nil then
@@ -464,21 +486,9 @@ local function read_files_list()
             --  log1("line_num: %s", line_num)
             --  io.close(file)
             --end
-
         end
 
         if log_file_list_raw_idx == #log_file_list_raw then
-            --print_table("log_file_list-non-sort", log_file_list)
-            --log("before sort1")
-            --table.sort(log_file_list, compare_file_names)
-            --log("after sort")
-            --print_table("log_file_list-sort", log_file_list)
-
-            --log("before sort2")
-            --print_table("date_list-non-sort", date_list)
-            --table.sort(date_list, compare_dates)
-            --log("after sort2")
-            --print_table("date_list-sort", date_list)
             return true
         end
     end
@@ -492,11 +502,16 @@ local function init()
 end
 
 local function onLogFileChange(obj)
+    table_print("log_file_list ww", log_file_list)
+    print("111")
+    table_print("log_file_list_filtered", log_file_list_filtered)
+    print("222")
+
     local i = obj.selected
     --labelDropDown.title = "Selected switch: " .. dropDownItems[i] .. " [" .. dropDownIndices[i] .. "]"
     log("Selected switch: " .. i)
-    log("Selected switch: " .. log_file_list[i])
-    filename = log_file_list[i]
+    log("Selected switch: " .. log_file_list_filtered[i])
+    filename = log_file_list_filtered[i]
     filename_idx = i
     log("filename: " .. filename)
 end
@@ -519,13 +534,54 @@ local function onAccuracyChange(obj)
         skipLines = 1
         heap = 2048 * 4
     end
-
-
 end
 
 local function filter_log_file_list(filter_model_name, filter_date)
-    log2("need to filter by: %s, %s", filter_model_name, filter_date)
-    --log_file_list = {"sss"}
+    log2("need to filter by: [%s] [%s]", filter_model_name, filter_date)
+
+    table_clear(log_file_list_filtered)
+
+    for i = 1, #log_file_list do
+        local ln = log_file_list[i]
+
+        --local is_model_name = (filter_model_name ~= nil) and (string.find(ln, filter_model_name) or string.sub(ln, 1,2)=="--")
+        --local is_date = (filter_date ~= nil) and (string.find(ln, "[" .. filter_date .. "]") or string.sub(ln, 1,2)=="--")
+
+        local modelName, year, month, day, hour, min, sec, m, d, y = string.match(ln, "^(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv$")
+
+        local is_model_name
+        if filter_model_name == nil or string.sub(filter_model_name, 1, 2) == "--" then
+            is_model_name = true
+        else
+            is_model_name = (modelName == filter_model_name)
+        end
+
+        local is_date
+        if filter_date == nil  or string.sub(filter_date, 1, 2) == "--"  then
+            is_date = true
+        else
+            local model_day = string.format("%s-%s-%s", year, month, day)
+            is_date = (model_day == filter_date)
+        end
+
+        if is_model_name and is_date then
+            log3("[%s] - OK (%s,%s)", ln, filter_model_name, filter_date)
+            table.insert(log_file_list_filtered, ln)
+        else
+            print("The word tiger was not found.")
+            log3("[%s] - NOT-FOUND (%s,%s)", ln, filter_model_name, filter_date)
+        end
+
+    end
+
+    if #log_file_list_filtered == 0 then
+        table.insert(log_file_list_filtered, "not found")
+    end
+    table_print("filter_log_file_list", log_file_list_filtered)
+
+    -- update the log combo to first
+    onLogFileChange(ddLogFile)
+    ddLogFile.selected = 1
 end
 
 local function state_INIT(event, touchState)
@@ -537,20 +593,25 @@ local function state_INIT(event, touchState)
 end
 
 local function state_SELECT_FILE_init(event, touchState)
+    table_clear(log_file_list_filtered)
+    for i = 1, #log_file_list do
+        table.insert(log_file_list_filtered, log_file_list[i])
+    end
+
     log("++++++++++++++++++++++++++++++++")
     if ctx1 == nil then
         -- creating new window gui
         log("creating new window gui")
         ctx1 = libGUI.newGUI()
 
-        ctx1.label(10, 25, 120, 24, "Select log file...", BOLD)
+        ctx1.label(10, 25, 120, 24, "log file...", BOLD)
 
         ctx1.label(10, 55, 60, 24, "Model")
         ctx1.dropDown(90, 55, 380, 24, model_name_list, 1,
             function(obj)
                 local i = obj.selected
                 filter_model_name = model_name_list[i]
-                log("Selected filter_date: " .. filter_model_name)
+                log("Selected model-name: " .. filter_model_name)
                 filter_log_file_list(filter_model_name, filter_date)
             end
         )
@@ -566,8 +627,8 @@ local function state_SELECT_FILE_init(event, touchState)
         )
 
         ctx1.label(10, 105, 60, 24, "Log file")
-        local dd3 = ctx1.dropDown(90, 105, 380, 24, log_file_list, filename_idx, onLogFileChange)
-        onLogFileChange(dd3)
+        ddLogFile = ctx1.dropDown(90, 105, 380, 24, log_file_list_filtered, filename_idx, onLogFileChange)
+        onLogFileChange(ddLogFile)
 
         ctx1.label(10, 130, 60, 24, "Accuracy")
         dd4 = ctx1.dropDown(90, 130, 380, 24, accuracy_list, 1, onAccuracyChange)
@@ -712,11 +773,9 @@ end
 
 local function state_SELECT_SENSORS_refresh(event, touchState)
     if event == EVT_VIRTUAL_EXIT or event == EVT_VIRTUAL_PREV_PAGE then
-        --filename = nil
         state = STATE.SELECT_FILE_INIT
         return 0
 
-        --elseif event == EVT_VIRTUAL_ENTER or event == EVT_ROT_BREAK then
     elseif event == EVT_VIRTUAL_NEXT_PAGE then
         buffer = ""
         hFile = io.open("/LOGS/" .. filename, "r")
@@ -870,10 +929,11 @@ local function state_PARSE_DATA_refresh(event, touchState)
                 local columnName = columns[sensorSelection[varIndex].value]
                 -- remove column units if exist
                 local i = string.find(columnName, "%(")
-                local unit = string.sub(columnName, i + 1, #columnName - 1)
-                --log2("read-header: %d, %s", i, unit)
+                local unit = ""
 
                 if i ~= nil then
+                --log2("read-header: %d, %s", i, unit)
+                    unit = string.sub(columnName, i + 1, #columnName - 1)
                     columnName = string.sub(columnName, 0, i - 1)
                 end
                 --log2("state_PARSE_DATA_refresh: col-name: %d. %s", varIndex, columnName)
@@ -1128,7 +1188,7 @@ local function drawGraph()
 
     -- draw all lines
     for varIndex = 1, 4, 1 do
-        if (sensorSelection[varIndex].value >= FIRST_VALID_COL) and (_points[varIndex].min~=0 or _points[varIndex].max ~=0)  then
+        if (sensorSelection[varIndex].value >= FIRST_VALID_COL) and (_points[varIndex].min ~= 0 or _points[varIndex].max ~= 0) then
             local varPoints = _points[varIndex]
             local varCfg = graphConfig[varIndex]
             --log(string.format("drawGraph: %d.%s %d min:%d max:%d", varIndex, varPoints.name, #varPoints.points, varPoints.min, varPoints.max))
@@ -1339,7 +1399,7 @@ local function run(event, touchState)
         return state_SELECT_FILE_init(event, touchState)
 
     elseif state == STATE.SELECT_FILE then
-        log("STATE.state_SELECT_FILE_refresh")
+        --log("STATE.state_SELECT_FILE_refresh")
         return state_SELECT_FILE_refresh(event, touchState)
 
     elseif state == STATE.READ_FILE_HEADER then
