@@ -1,8 +1,8 @@
-local toolName = "TNS|Log Viewer v0.2|TNE"
+local toolName = "TNS|_Log Viewer v1.0|TNE"
 
 ---- #########################################################################
 ---- #                                                                       #
----- # License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html               #
+---- # License GPLv3: https://www.gnu.org/licenses/gpl-3.0.html              #
 ---- #                                                                       #
 ---- # This program is free software; you can redistribute it and/or modify  #
 ---- # it under the terms of the GNU General Public License version 2 as     #
@@ -19,7 +19,7 @@ local toolName = "TNS|Log Viewer v0.2|TNE"
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2022
--- ver: 0.2
+-- ver: 1.0
 
 
 --function cache
@@ -90,7 +90,7 @@ local sensorSelection = {
     { y = 80, label = "Field 1", values = {}, value = 2, min = 0 },
     { y = 105, label = "Field 2", values = {}, value = 3, min = 0 },
     { y = 130, label = "Field 3", values = {}, value = 4, min = 0 },
-    { y = 155, label = "Field 4", values = {}, value = 5, min = 0 }
+    { y = 155, label = "Field 4", values = {}, value = 1, min = 0 }
 }
 
 local graphConfig = {
@@ -119,6 +119,9 @@ local graphStart = 0
 local graphSize = 0
 local graphTimeBase = 0
 local graphMinMaxIndex = 0
+
+local img1 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg1.png")
+local img2 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg3.png")
 
 --------------------------------------------------------------
 -- Return GUI library table
@@ -557,7 +560,7 @@ local function filter_log_file_list(filter_model_name, filter_date)
         end
 
         local is_date
-        if filter_date == nil  or string.sub(filter_date, 1, 2) == "--"  then
+        if filter_date == nil or string.sub(filter_date, 1, 2) == "--" then
             is_date = true
         else
             local model_day = string.format("%s-%s-%s", year, month, day)
@@ -932,7 +935,7 @@ local function state_PARSE_DATA_refresh(event, touchState)
                 local unit = ""
 
                 if i ~= nil then
-                --log2("read-header: %d, %s", i, unit)
+                    --log2("read-header: %d, %s", i, unit)
                     unit = string.sub(columnName, i + 1, #columnName - 1)
                     columnName = string.sub(columnName, 0, i - 1)
                 end
@@ -992,48 +995,60 @@ local function drawMain()
     lcd.clear()
 
     -- draw background
-    --lcd.drawFilledRectangle(0, 0, LCD_W, LCD_H, COLOR_THEME_SECONDARY3)
     if state ~= STATE.SHOW_GRAPH then
-        lcd.drawFilledRectangle(0, 0, LCD_W, LCD_H, WHITE)
+        -- lcd.drawFilledRectangle(0, 0, LCD_W, LCD_H, WHITE)
+
+        -- draw top-bar
+        lcd.drawFilledRectangle(0, 0, LCD_W, 20, TITLE_BGCOLOR)
+
+        --lcd.drawText(LCD_W - 95, LCD_H - 18, "Offer Shmuely", SMLSIZE)
+        lcd.drawBitmap(img1, 0, 0)
+
     else
-        lcd.drawFilledRectangle(0, 0, LCD_W, LCD_H, BLACK)
+    --    lcd.drawFilledRectangle(0, 0, LCD_W, LCD_H, BLACK)
+
+        lcd.drawText(LCD_W - 85, LCD_H - 18, "Offer Shmuely", SMLSIZE + GREEN)
+        lcd.drawBitmap(img2, 0, 0)
+
     end
 
-    -- draw top-bar
-    lcd.drawFilledRectangle(0, 0, LCD_W, 20, TITLE_BGCOLOR)
-    lcd.setColor(CUSTOM_COLOR, lcd.RGB(193, 198, 215))
-    --lcd.drawFilledRectangle(0, 0, LCD_W, 20, CUSTOM_COLOR) --"#BDC2D3"
-    --lcd.drawFilledRectangle(0, 0, LCD_W, 20, BLACK) --"#BDC2D3"
-    --lcd.drawFilledRectangle(0, 0, LCD_W, 20, COLOR_THEME_PRIMARY3)
+     --draw top-bar
+    --lcd.drawFilledRectangle(0, 0, LCD_W, 20, TITLE_BGCOLOR)
+    --lcd.setColor(CUSTOM_COLOR, lcd.RGB(193, 198, 215))
 
     if filename ~= nil then
-        --lcd.setColor(CUSTOM_COLOR, lcd.RGB(93,130,244))
-        --lcd.drawText(30, 1, "/LOGS/" .. filename, CUSTOM_COLOR + SMLSIZE)
         lcd.drawText(30, 1, "/LOGS/" .. filename, WHITE + SMLSIZE)
-        --lcd.drawText(8, 1, "/LOGS/" .. filename, MENU_TITLE_COLOR + SMLSIZE)
     end
+
 end
 
 local function run_GRAPH_Adjust(amount, mode)
+    local scroll_due_cursor = 0
+
     if mode == GRAPH_CURSOR then
         cursor = cursor + math.floor(amount)
         if cursor > 100 then
             cursor = 100
+            scroll_due_cursor = 1
         elseif cursor < 0 then
             cursor = 0
+            scroll_due_cursor = -1
         end
-    elseif mode == GRAPH_ZOOM then
-        if amount > 4 then
-            amount = 4
-        elseif amount < -4 then
-            amount = -4
+    end
+
+    if mode == GRAPH_ZOOM then
+        if amount > 40 then
+            amount = 40
+        elseif amount < -40 then
+            amount = -40
         end
 
         local oldGraphSize = graphSize
-        graphSize = math.floor(graphSize / (1 + (amount * 0.2)))
+        graphSize = math.floor(graphSize / (1 + (amount * 0.02)))
 
-        if graphSize < 101 then
-            graphSize = 101
+        -- max zoom control
+        if graphSize < 31 then
+            graphSize = 31
         elseif graphSize > valPos then
             graphSize = valPos
         end
@@ -1062,7 +1077,9 @@ local function run_GRAPH_Adjust(amount, mode)
                 _points[varIndex].points = {}
             end
         end
-    elseif mode == GRAPH_MINMAX then
+    end
+
+    if mode == GRAPH_MINMAX then
         local point = _points[(math.floor(graphMinMaxIndex / 2)) + 1]
 
         local delta = math.floor((point.max - point.min) / 50 * amount)
@@ -1086,9 +1103,15 @@ local function run_GRAPH_Adjust(amount, mode)
                 point.min = point.max - 1
             end
         end
-    elseif mode == GRAPH_SCROLL then
-        graphStart = graphStart + math.floor(((graphSize / 10) * amount))
+    end
 
+    if mode == GRAPH_SCROLL or scroll_due_cursor ~= 0 then
+
+        if mode == GRAPH_CURSOR then
+            amount = scroll_due_cursor
+        end
+
+        graphStart = graphStart + math.floor((graphSize / 100) * amount)
         if graphStart + graphSize > valPos then
             graphStart = valPos - graphSize
         elseif graphStart < 0 then
@@ -1106,14 +1129,7 @@ local function run_GRAPH_Adjust(amount, mode)
 end
 
 local function drawGraph_base()
-    --lcd.drawLine(graphConfig.x_start, graphConfig.y_start, graphConfig.x_start, graphConfig.y_end, SOLID, CUSTOM_COLOR)
-    --lcd.drawLine(graphConfig.x_start, graphConfig.y_end, graphConfig.x_end, graphConfig.y_end, SOLID, CUSTOM_COLOR)
-    --lcd.drawLine(graphConfig.x_end, graphConfig.y_start, graphConfig.x_end, graphConfig.y_end, SOLID, CUSTOM_COLOR)
-    --lcd.drawLine(graphConfig.x_start, graphConfig.y_start, graphConfig.x_end, graphConfig.y_start, DOTTED, CUSTOM_COLOR)
-
-    local mode_x = 390
-    local mode_y = 1
-    local txt = nil
+    local txt
     if graphMode == GRAPH_CURSOR then
         txt = "Cursor"
     elseif graphMode == GRAPH_ZOOM then
@@ -1123,9 +1139,10 @@ local function drawGraph_base()
     else
         txt = "Scroll"
     end
-    lcd.drawFilledRectangle(mode_x, mode_y, 100, 18, DARKGREEN)
-    --local mode_style = SMLSIZE + TEXT_INVERTED_COLOR + INVERS
-    lcd.drawText(mode_x, mode_y, "Mode: " .. txt, SMLSIZE + WHITE)
+
+    --lcd.drawFilledRectangle(390, 1, 100, 18, DARKGREEN)
+    lcd.drawText(380, 3, "Mode: " .. txt, SMLSIZE + BLACK)
+    --lcd.drawText(LCD_W - 85, LCD_H - 18, "Offer Shmuely", SMLSIZE + GREEN)
 end
 
 local function drawGraph_points(points, min, max)
@@ -1273,19 +1290,15 @@ local function state_SHOW_GRAPH_refresh(event, touchState)
         if graphMinMaxIndex == 8 then
             graphMinMaxIndex = 0
         end
-
         if graphMinMaxIndex == 2 and sensorSelection[2].value == 0 then
             graphMinMaxIndex = 4
         end
-
         if graphMinMaxIndex == 4 and sensorSelection[3].value == 0 then
             graphMinMaxIndex = 6
         end
-
         if graphMinMaxIndex == 6 and sensorSelection[4].value == 0 then
             graphMinMaxIndex = 0
         end
-
         if graphMinMaxIndex == 0 and sensorSelection[1].value == 0 then
             graphMinMaxIndex = 2
         end
@@ -1295,23 +1308,18 @@ local function state_SHOW_GRAPH_refresh(event, touchState)
         if graphMinMaxIndex < 0 then
             graphMinMaxIndex = 7
         end
-
         if graphMinMaxIndex == 7 and sensorSelection[4].value == 0 then
             graphMinMaxIndex = 5
         end
-
         if graphMinMaxIndex == 5 and sensorSelection[3].value == 0 then
             graphMinMaxIndex = 3
         end
-
         if graphMinMaxIndex == 3 and sensorSelection[2].value == 0 then
             graphMinMaxIndex = 1
         end
-
         if graphMinMaxIndex == 1 and sensorSelection[1].value == 0 then
             graphMinMaxIndex = 7
         end
-        --elseif event == EVT_ENTER_BREAK or event == EVT_ROT_BREAK then
     elseif event == EVT_VIRTUAL_ENTER or event == EVT_ROT_BREAK then
         if graphMode == GRAPH_CURSOR then
             graphMode = GRAPH_ZOOM
@@ -1338,18 +1346,30 @@ local function state_SHOW_GRAPH_refresh(event, touchState)
         run_GRAPH_Adjust(adjust, GRAPH_SCROLL)
     end
 
-    local adjust = getValue('ail') / 200
-    if math.abs(adjust) > 0.5 then
-        if graphMode == GRAPH_MINMAX then
-            run_GRAPH_Adjust(adjust, GRAPH_MINMAX)
+    local adjust = getValue('ail')
+    if math.abs(adjust) > 100 then
+        if math.abs(adjust) < 800 then
+            adjust = adjust / 100
         else
+            adjust = adjust / 50
+        end
+        if graphMode ~= GRAPH_MINMAX then
             run_GRAPH_Adjust(adjust, GRAPH_SCROLL)
         end
     end
 
     adjust = getValue('ele') / 200
     if math.abs(adjust) > 0.5 then
-        run_GRAPH_Adjust(-adjust, GRAPH_ZOOM)
+        if graphMode ~= GRAPH_MINMAX then
+            run_GRAPH_Adjust(adjust, GRAPH_ZOOM)
+        else
+            run_GRAPH_Adjust(-adjust, GRAPH_MINMAX)
+        end
+    end
+
+    adjust = getValue('rud') / 200
+    if math.abs(adjust) > 0.5 then
+        run_GRAPH_Adjust(adjust, GRAPH_CURSOR)
     end
 
     --adjust = getValue('jsy') / 200
@@ -1357,16 +1377,10 @@ local function state_SHOW_GRAPH_refresh(event, touchState)
     --    run_GRAPH_Adjust(adjust, GRAPH_ZOOM)
     --end
 
-    adjust = getValue('rud') / 200
-    if math.abs(adjust) > 0.5 then
-        run_GRAPH_Adjust(adjust, GRAPH_CURSOR)
-    end
-
     --adjust = getValue('jsx') / 200
     --if math.abs(adjust) > 0.5 then
     --    run_GRAPH_Adjust(adjust, GRAPH_SCROLL)
     --end
-
 
     drawGraph()
     return 0
