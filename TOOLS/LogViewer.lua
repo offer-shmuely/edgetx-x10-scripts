@@ -1,4 +1,4 @@
-local toolName = "TNS|_Log Viewer v1.0|TNE"
+local toolName = "TNS|Log Viewer v1.0|TNE"
 
 ---- #########################################################################
 ---- #                                                                       #
