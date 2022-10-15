@@ -1,4 +1,4 @@
-local toolName = "TNS|_Log Viewer v1.2|TNE"
+local toolName = "TNS|_Log Viewer v1.3|TNE"
 
 ---- #########################################################################
 ---- #                                                                       #
@@ -19,12 +19,12 @@ local toolName = "TNS|_Log Viewer v1.2|TNE"
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2022
--- ver: 1.2
+-- ver: 1.3
 
 local m_log = {}
 local m_log_parser = {}
-local m_utils =  {}
-local m_tables =  {}
+local m_utils = {}
+local m_tables = {}
 local m_index_file = {}
 
 --function cache
@@ -38,9 +38,9 @@ local heap = 2048
 local hFile
 local min_log_sec_to_show = 60
 
+-- read_and_index_file_list()
 local log_file_list_raw = {}
 local log_file_list_raw_idx = -1
-local log_file_list = {}
 
 local log_file_list_filtered = {}
 local filter_model_name
@@ -53,7 +53,8 @@ local ddLogFile = nil -- log-file dropDown object
 local filename
 local filename_idx = 1
 
-local columns = {}
+local columns_by_header = {}
+local columns_with_data = {}
 local current_session = nil
 local FIRST_VALID_COL = 2
 
@@ -92,10 +93,10 @@ local buffer = ""
 local current_option = 1
 
 local sensorSelection = {
-    { y = 80, label = "Field 1", values = {}, value = 2, min = 0 },
-    { y = 105, label = "Field 2", values = {}, value = 3, min = 0 },
-    { y = 130, label = "Field 3", values = {}, value = 4, min = 0 },
-    { y = 155, label = "Field 4", values = {}, value = 1, min = 0 }
+    { y = 80, label = "Field 1", values = {}, idx = 2, colId = 0, min = 0 },
+    { y = 105, label = "Field 2", values = {}, idx = 3, colId = 0, min = 0 },
+    { y = 130, label = "Field 3", values = {}, idx = 4, colId = 0, min = 0 },
+    { y = 155, label = "Field 4", values = {}, idx = 1, colId = 0, min = 0 }
 }
 
 local graphConfig = {
@@ -105,10 +106,10 @@ local graphConfig = {
     x_end = LCD_W,
     y_start = 40,
     y_end = 240,
-    { color = BLUE, valx = 80, valy = 249, minx = 5, miny = 220, maxx = 5, maxy = 30 },
-    { color = GREEN, valx = 170, valy = 249, minx = 5, miny = 205, maxx = 5, maxy = 45 },
-    { color = RED, valx = 265, valy = 249, minx = 5, miny = 190, maxx = 5, maxy = 60 },
-    { color = WHITE, valx = 380, valy = 249, minx = 5, miny = 175, maxx = 5, maxy = 75 }
+    { color = GREEN, valx = 20, valy = 249, minx = 5, miny = 220, maxx = 5, maxy = 30 },
+    { color = RED, valx = 130, valy = 249, minx = 5, miny = 205, maxx = 5, maxy = 45 },
+    { color = WHITE, valx = 250, valy = 249, minx = 5, miny = 190, maxx = 5, maxy = 60 },
+    { color = BLUE, valx = 370, valy = 249, minx = 5, miny = 175, maxx = 5, maxy = 75 }
 }
 
 local xStep = (graphConfig.x_end - graphConfig.x_start) / 100
@@ -125,7 +126,7 @@ local graphMode = GRAPH_MODE.CURSOR
 local graphStart = 0
 local graphSize = 0
 local graphTimeBase = 0
-local graphMinMaxIndex = 0
+local graphMinMaxEditorIndex = 0
 
 local img1 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg1.png")
 local img2 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg2.png")
@@ -175,7 +176,7 @@ m_log.levels = {
     fatal = 6
 }
 
-m_log.round = function(x, increment)
+function m_log.round(x, increment)
     increment = increment or 1
     x = x / increment
     return (x > 0 and math.floor(x + .5) or math.ceil(x - .5)) * increment
@@ -183,7 +184,7 @@ end
 
 m_log._tostring = m_log.tostring
 
-m_log.tostring = function(...)
+function m_log.tostring(...)
     local t = {}
     for i = 1, select('#', ...) do
         local x = select(i, ...)
@@ -195,25 +196,21 @@ m_log.tostring = function(...)
     return table.concat(t, " ")
 end
 
-m_log.do_log = function(i, ulevel, fmt, ...)
-     --below the log level
-    if i < m_log.levels[m_log.log.level] then
+function m_log.do_log(iLevel, ulevel, fmt, ...)
+    if iLevel < m_log.levels[m_log.log.level] then
+        --below the log level
         return
     end
 
-    local num_arg = #{...}
+    local num_arg = #{ ... }
     local msg
     if num_arg > 0 then
         msg = string.format(fmt, ...)
     else
         msg = fmt
     end
-    --print(msg)
 
-    --local info = debug.getinfo(2, "Sl")
-    --local lineinfo = info.short_src .. ":" .. info.currentline
     local lineinfo = "f.lua:0"
-
     local msg2 = string.format("[%-4s] %s: %s", ulevel, lineinfo, msg)
 
     -- output to console
@@ -227,24 +224,24 @@ m_log.do_log = function(i, ulevel, fmt, ...)
     end
 end
 
-m_log.trace = function(fmt, ...)
+function m_log.trace(fmt, ...)
     m_log.do_log(m_log.levels.trace, "TRACE", fmt, ...)
 end
-m_log.debug = function(fmt, ...)
+function m_log.debug(fmt, ...)
     m_log.do_log(m_log.levels.debug, "DEBUG", fmt, ...)
 end
-m_log.info = function(fmt, ...)
+function m_log.info(fmt, ...)
     --print(fmt)
     m_log.do_log(m_log.levels.info, "INFO", fmt, ...)
 end
-m_log.warn = function(fmt, ...)
+function m_log.warn(fmt, ...)
     m_log.do_log(m_log.levels.warn, "WARN", fmt, ...)
 end
-m_log.error = function(fmt, ...)
+function m_log.error(fmt, ...)
     m_log.do_log(m_log.levels.error, "ERROR", fmt, ...)
 end
-m_log.fatal = function(fmt, ...)
-    m_log.do_log(m_log.levels.fatal, "FATAL",fmt, ...)
+function m_log.fatal(fmt, ...)
+    m_log.do_log(m_log.levels.fatal, "FATAL", fmt, ...)
 end
 
 --endregion
@@ -283,8 +280,10 @@ end
 -- remove trailing and leading whitespace from string.
 -- http://en.wikipedia.org/wiki/Trim_(programming)
 function m_utils.trim(s)
+    if s == nil then
+        return nil
+    end
     return (string.gsub(s, "^%s*(.-)%s*$", "%1"))
-    --string.gsub(text, ",,", ", ,")
 end
 
 function m_utils.trim_safe(s)
@@ -338,7 +337,7 @@ function m_tables.table_print(prefix, tbl)
             m_log.info(string.format("%d. %s: %s", i, prefix, val))
         else
             local t_val = val
-            m_log.info2("-++++------------ %d %s", #val, type(t_val))
+            m_log.info("-++++------------ %d %s", #val, type(t_val))
             for j = 1, #t_val, 1 do
                 local val = t_val[j]
                 m_log.info(string.format("%d. %s: %s", i, prefix, val))
@@ -346,6 +345,36 @@ function m_tables.table_print(prefix, tbl)
         end
     end
     m_log.info("------------- table_print end")
+end
+
+function m_tables.compare_file_names(a, b)
+    a1 = string.sub(a.file_name, -21, -5)
+    b1 = string.sub(b.file_name, -21, -5)
+    --m_log.info("ab, %s ? %s", a, b)
+    --m_log.info("a1b1, %s ? %s", a1, b1)
+    return a1 > b1
+end
+
+
+function m_tables.list_ordered_insert(lst, newVal, cmp, firstValAt)
+    -- sort
+    for i = firstValAt, #lst, 1 do
+        -- remove duplication
+        --m_log.info("list_ordered_insert - %s ? %s",  newVal, lst[i] )
+        if newVal == lst[i] then
+            --print_table("list_ordered_insert - duplicated", lst)
+            return
+        end
+
+        if cmp(newVal, lst[i]) == true then
+            table.insert(lst, i, newVal)
+            --print_table("list_ordered_insert - inserted", lst)
+            return
+        end
+        --print_table("list_ordered_insert-loop", lst)
+    end
+    table.insert(lst, newVal)
+    --print_table("list_ordered_insert-inserted-to-end", lst)
 end
 
 --endregion
@@ -357,14 +386,14 @@ end
 
 --local m_log_parser = {}
 
-m_log_parser.getTotalSeconds = function(time)
+function m_log_parser.getTotalSeconds(time)
     local total = tonumber(string.sub(time, 1, 2)) * 3600
     total = total + tonumber(string.sub(time, 4, 5)) * 60
     total = total + tonumber(string.sub(time, 7, 8))
     return total
 end
 
-m_log_parser.getFileDataInfo = function(fileName)
+function m_log_parser.getFileDataInfo(fileName)
 
     local hFile = io.open("/LOGS/" .. fileName, "r")
     if hFile == nil then
@@ -377,6 +406,7 @@ m_log_parser.getFileDataInfo = function(fileName)
     local total_lines = 0
     local start_index
     local col_with_data_str = ""
+    local all_col_str = ""
 
     local columns_by_header = {}
     local columns_is_have_data = {}
@@ -425,13 +455,20 @@ m_log_parser.getFileDataInfo = function(fileName)
                 local col_name = columns_by_header[idxCol]
                 col_name = string.gsub(col_name, "\n", "")
                 if columns_is_have_data[idxCol] == true and col_name ~= "Date" and col_name ~= "Time" then
-                    columns_with_data[#columns_with_data+1] = col_name
+                    columns_with_data[#columns_with_data + 1] = col_name
                     if string.len(col_with_data_str) == 0 then
                         col_with_data_str = col_name
                     else
                         col_with_data_str = col_with_data_str .. "|" .. col_name
                     end
                 end
+
+                if string.len(all_col_str) == 0 then
+                    all_col_str = col_name
+                else
+                    all_col_str = all_col_str .. "|" .. col_name
+                end
+
             end
 
             m_log.info("parser:getFileDataInfo: done - col_with_data_str: %s", col_with_data_str)
@@ -439,7 +476,7 @@ m_log_parser.getFileDataInfo = function(fileName)
             --    m_log.info("getFileDataInfo@ %d: %s", idxCol, columns_with_data[idxCol])
             --end
 
-            return start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str
+            return start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str
         end
 
         buffer = buffer .. data2
@@ -484,11 +521,6 @@ m_log_parser.getFileDataInfo = function(fileName)
     end
 
     io.close(hFile)
-    --local first_time_sec = getTotalSeconds(start_time)
-    --local last_time_sec = getTotalSeconds(end_time)
-    --local total_seconds = last_time_sec - first_time_sec
-    --m_log.info("getFileDataInfo: [%s] early exit! lines: %d, duration: %dsec", fileName, total_lines, total_seconds)
-    --return total_lines, total_seconds, col_with_data_str, start_time, end_time -- startIndex, endIndex
 
     m_log.info("error: file too long, %s", fileName)
     return nil, nil, nil, nil, nil, nil
@@ -506,40 +538,43 @@ m_index_file.idx_file_name = "/LOGS/log-viewer.csv"
 --m_index_fileidx_file_name = "/SCRIPTS/TOOLS/LogViewer/log-viewer.csv"
 m_index_file.log_files_index_info = {}
 
-
-m_index_file.indexInit = function ()
+function m_index_file.indexInit()
     m_tables.table_clear(m_index_file.log_files_index_info)
     --log_files_index_info = {}
 end
 
-m_index_file.updateFile = function(file_name, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str)
+function m_index_file.updateFile(file_name, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str)
     m_log.info("updateFile(%s)", file_name)
 
-    m_index_file.log_files_index_info[#m_index_file.log_files_index_info + 1] = {
+    local new_file = {
         file_name = m_utils.trim(file_name),
         start_time = m_utils.trim(start_time),
         end_time = m_utils.trim(end_time),
         total_seconds = tonumber(m_utils.trim(total_seconds)),
         total_lines = tonumber(m_utils.trim(total_lines)),
         start_index = tonumber(m_utils.trim(start_index)),
-        col_with_data_str = m_utils.trim(col_with_data_str)
+        col_with_data_str = m_utils.trim(col_with_data_str),
+        all_col_str = m_utils.trim(all_col_str)
     }
+
+    m_tables.list_ordered_insert(m_index_file.log_files_index_info, new_file, m_tables.compare_file_names, 1)
     --m_log.info("22222222222: %d - %s", #log_files_index_info, file_name)
 end
 
-m_index_file.show = function(prefix)
+function m_index_file.show(prefix)
     local tbl = m_index_file.log_files_index_info
     m_log.info("-------------show start (%s)", prefix)
     for i = 1, #tbl, 1 do
         local f_info = tbl[i]
-        local s = string.format("%d. file_name:%s, start_time: %s, end_time: %s, total_seconds: %s, total_lines: %s, start_index: %s, col_with_data_str: [%s]", i,
+        local s = string.format("%d. file_name:%s, start_time: %s, end_time: %s, total_seconds: %s, total_lines: %s, start_index: %s, col_with_data_str: [%s], all_col_str: [%s]", i,
             f_info.file_name,
             f_info.start_time,
             f_info.end_time,
             f_info.total_seconds,
             f_info.total_lines,
             f_info.start_index,
-            f_info.col_with_data_str
+            f_info.col_with_data_str,
+            f_info.all_col_str
         )
 
         m_log.info(s)
@@ -547,7 +582,7 @@ m_index_file.show = function(prefix)
     m_log.info("------------- show end")
 end
 
-m_index_file.indexRead = function()
+function m_index_file.indexRead()
     m_log.info("indexRead()")
     m_tables.table_clear(m_index_file.log_files_index_info)
     local hFile = io.open(m_index_file.idx_file_name, "r")
@@ -573,7 +608,7 @@ m_index_file.indexRead = function()
     --m_index_file.show("indexRead-should-be-empty")
     for line in string.gmatch(data2, "([^\n]+)\n") do
 
-        if string.sub(line,1,1) ~= "#" then
+        if string.sub(line, 1, 1) ~= "#" then
             m_log.info("indexRead: index-line: %s", line)
             local values = m_utils.split(line)
 
@@ -584,16 +619,17 @@ m_index_file.indexRead = function()
             local total_lines = m_utils.trim(values[5])
             local start_index = m_utils.trim(values[6])
             local col_with_data_str = m_utils.trim_safe(values[7])
-            --m_log.info(string.format("indexRead: got: file_name: %s, start_time: %s, end_time: %s, total_seconds: %s, total_lines: %s, start_index: %s, col_with_data_str: %s", file_name, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str))
-            m_index_file.updateFile(file_name, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str)
+            local all_col_str = m_utils.trim_safe(values[8])
+            --m_log.info(string.format("indexRead: got: file_name: %s, start_time: %s, end_time: %s, total_seconds: %s, total_lines: %s, start_index: %s, col_with_data_str: %s, all_col_str: %s", file_name, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str))
+            m_index_file.updateFile(file_name, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str)
         end
     end
 
     io.close(hFile)
-    m_index_file.show("indexRead-should-with-data")
+    --m_index_file.show("indexRead-should-with-data")
 end
 
-m_index_file.getFileDataInfo = function(file_name)
+function m_index_file.getFileDataInfo(file_name)
     m_log.info("getFileDataInfo(%s)", file_name)
     --m_index_file.show("getFileDataInfo-start")
 
@@ -602,44 +638,40 @@ m_index_file.getFileDataInfo = function(file_name)
         --m_log.info("getFileDataInfo: %s ?= %s", file_name, f_info.file_name)
         if file_name == f_info.file_name then
             m_log.info("getFileDataInfo: info from cache %s", file_name)
-            return false, f_info.start_time, f_info.end_time, f_info.total_seconds, f_info.total_lines, f_info.start_index, f_info.col_with_data_str
+            return false, f_info.start_time, f_info.end_time, f_info.total_seconds, f_info.total_lines, f_info.start_index, f_info.col_with_data_str, f_info.all_col_str
         end
     end
 
     m_log.info("getFileDataInfo: file not in index, indexing... %s", file_name)
-    --m_index_file..show("getFileDataInfo-2")
 
-    local start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str = m_log_parser.getFileDataInfo(file_name)
+    local start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str = m_log_parser.getFileDataInfo(file_name)
 
     if start_time == nil then
-        return false, nil, nil, nil, nil, nil, nil
+        return false, nil, nil, nil, nil, nil, nil, nil
     end
-
-    --m_index_file.show("getFileDataInfo-2.5")
 
     m_index_file.updateFile(
         file_name,
         start_time, end_time, total_seconds,
         total_lines,
         start_index,
-        col_with_data_str)
+        col_with_data_str,
+        all_col_str)
 
-    --m_index_file.show("getFileDataInfo-3")
     m_index_file.indexSave()
-    return true, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str
-    --return nil, nil, nil, nil
+    return true, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str
 end
 
-m_index_file.indexSave = function()
+function m_index_file.indexSave()
     m_log.info("indexSave()")
     --local is_exist = is_file_exists(idx_file_name)
     local hFile = io.open(m_index_file.idx_file_name, "w")
 
     -- header
-    local line_format = "%-42s,%-10s,%-10s,%-13s,%-11s,%-11s,%s\n"
-    local headline = string.format(line_format, "file_name", "start_time", "end_time", "total_seconds", "total_lines", "start_index", "col_with_data_str")
+    local line_format = "%-42s,%-10s,%-10s,%-13s,%-11s,%-11s,%s,   %s\n"
+    local headline = string.format(line_format, "file_name", "start_time", "end_time", "total_seconds", "total_lines", "start_index", "col_with_data_str", "all_col_str")
     io.write(hFile, headline)
-    local ver_line = "# api_ver=1\n"
+    local ver_line = "# api_ver=2\n"
     io.write(hFile, ver_line)
 
     --m_index_file.show("log_files_index_info")
@@ -647,14 +679,15 @@ m_index_file.indexSave = function()
     for i = 1, #m_index_file.log_files_index_info, 1 do
         local info = m_index_file.log_files_index_info[i]
 
-        local line = string.format( line_format,
+        local line = string.format(line_format,
             info.file_name,
             info.start_time,
             info.end_time,
             info.total_seconds,
             info.total_lines,
             info.start_index,
-            info.col_with_data_str)
+            info.col_with_data_str,
+            info.all_col_str)
 
         io.write(hFile, line)
     end
@@ -689,10 +722,6 @@ local function toDuration2(totalSeconds)
     local seconds = totalSeconds - (minutes * 60)
 
     return doubleDigits(minutes) .. "." .. doubleDigits(seconds) .. "min";
-
-    --local minutes = math_floor(totalSeconds / 60)
-    --return minutes .. " minutes";
-    --return totalSeconds .. " sec";
 end
 
 local function getTotalSeconds(time)
@@ -717,7 +746,7 @@ local function collectData()
         _values = {}
 
         for varIndex = 1, 4, 1 do
-            if sensorSelection[varIndex].value >= 2 then
+            if sensorSelection[varIndex].idx >= FIRST_VALID_COL then
                 _points[varIndex] = {}
                 _values[varIndex] = {}
             end
@@ -737,12 +766,12 @@ local function collectData()
     for line in string_gmatch(buffer, "([^\n]+)\n") do
         if math.fmod(lines, skipLines) == 0 then
             local vals = m_utils.split(line)
-            --m_log.info(string.format("collectData: 1: %s, 2: %s, 3: %s, 4: %s, line: %s", vals[1], vals[2], vals[3], vals[4], line))
+            m_log.info(string.format("collectData: 1: %s, 2: %s, 3: %s, 4: %s, line: %s", vals[1], vals[2], vals[3], vals[4], line))
 
             for varIndex = 1, 4, 1 do
-                if sensorSelection[varIndex].value >= FIRST_VALID_COL then
-                    local colId = sensorSelection[varIndex].value + 1
-                    --m_log.info(string.format("collectData: varIndex: %d, value: %d, %d", varIndex, sensorSelection[varIndex].value, vals[colId]))
+                if sensorSelection[varIndex].idx >= FIRST_VALID_COL then
+                    local colId = sensorSelection[varIndex].colId
+                    m_log.info(string.format("collectData: varIndex: %d, sensorSelectionId: %d, colId: %d, val: %d", varIndex, sensorSelection[varIndex].colId, colId, vals[colId]))
                     _values[varIndex][valPos] = vals[colId]
                 end
             end
@@ -769,65 +798,12 @@ end
 
 -- ---------------------------------------------------------------------------------------------------------
 
-local function compare_file_names(a, b)
-    a1 = string.sub(a, -21, -5)
-    b1 = string.sub(b, -21, -5)
-    --m_log.info("ab, %s ? %s", a, b)
-    --m_log.info("a1b1, %s ? %s", a1, b1)
-    return a1 > b1
-end
-
 local function compare_dates(a, b)
     return a > b
 end
 
 local function compare_names(a, b)
     return a < b
-end
-
-local function list_ordered_insert2(lst, newVal, cmp, firstValAt)
-    -- remove duplication
-    for i = 1, #lst do
-        if lst[i] == newVal then
-            return
-        end
-    end
-
-    lst[#lst + 1] = newVal
-
-    -- sort
-    for i = #lst - 1, firstValAt, -1 do
-        if cmp(lst[i], lst[i + 1]) == false then
-            local tmp = lst[i]
-            lst[i] = lst[i + 1]
-            lst[i + 1] = tmp
-        end
-    end
-    --print("list_ordered_insert:----------------\n")
-    --print_table("list_ordered_insert", log_file_list)
-end
-
-local function list_ordered_insert(lst, newVal, cmp, firstValAt)
-    --print("list_ordered_insert:----------------\n")
-
-    -- sort
-    for i = firstValAt, #lst, 1 do
-        -- remove duplication
-        --m_log.info("list_ordered_insert - %s ? %s",  newVal, lst[i] )
-        if newVal == lst[i] then
-            --print_table("list_ordered_insert - duplicated", lst)
-            return
-        end
-
-        if cmp(newVal, lst[i]) == true then
-            table.insert(lst, i, newVal)
-            --print_table("list_ordered_insert - inserted", lst)
-            return
-        end
-        --print_table("list_ordered_insert-loop", lst)
-    end
-    table.insert(lst, newVal)
-    --print_table("list_ordered_insert-inserted-to-end", lst)
 end
 
 local function drawProgress(y, current, total)
@@ -841,7 +817,7 @@ end
 -- read log file list
 local function read_and_index_file_list()
 
-    m_log.info("read_and_index_file_list(%d, %d)", log_file_list_raw_idx, #log_file_list_raw)
+    --m_log.info("read_and_index_file_list(%d, %d)", log_file_list_raw_idx, #log_file_list_raw)
 
     if (#log_file_list_raw == 0) then
         m_log.info("read_and_index_file_list: init")
@@ -854,63 +830,47 @@ local function read_and_index_file_list()
             log_file_list_raw[log_file_list_raw_idx + 1] = fn
             log_file_list_raw_idx = log_file_list_raw_idx + 1
         end
-        --m_log.info("1 log_file_list_raw: %s", log_file_list_raw)
         log_file_list_raw_idx = 0
-        m_tables.table_print("log_file_list_raw", log_file_list_raw)
+        --m_tables.table_print("log_file_list_raw", log_file_list_raw)
         m_index_file.indexRead()
     end
-
-    --math.min(10, #log_file_list_raw - log_file_list_raw_idx)
 
     for i = 1, 10, 1 do
         log_file_list_raw_idx = log_file_list_raw_idx + 1
         local fileName = log_file_list_raw[log_file_list_raw_idx]
         if fileName ~= nil then
-
+            lcd.clear()
             lcd.drawText(5, 30, "Analyzing & indexing files", TEXT_COLOR + BOLD)
             lcd.drawText(5, 60, string.format("indexing files: (%d/%d)", log_file_list_raw_idx, #log_file_list_raw), TEXT_COLOR + SMLSIZE)
             drawProgress(60, log_file_list_raw_idx, #log_file_list_raw)
 
             m_log.info("log file: (%d/%d) %s (detecting...)", log_file_list_raw_idx, #log_file_list_raw, fileName)
 
-            -- F3A UNI recorde-2022-02-09-082937.csv
             local modelName, year, month, day, hour, min, sec, m, d, y = string.match(fileName, "^(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv$")
-            if modelName ~= nil then
-                --m_log.info("log file: %s (is csv)", fileName)
-                --m_log.info(string.format("modelName:%s, day:%s, month:%s, year:%s, hour:%s, min:%s, sec:%s", modelName, day, month, year, hour, min, sec))
+            if modelName == nil then
+                goto continue
+            end
+            --m_log.info("log file: %s (is csv)", fileName)
+            local model_day = string.format("%s-%s-%s", year, month, day)
 
-                --m_log.info("os.time", os.time{year=year, month=month, day=day, hour=hour, min=min, sec=sec})
-                local model_datetime = string.format("%s-%s-%sT%s:%s:%s", year, month, day, hour, min, sec)
-                local model_day = string.format("%s-%s-%s", year, month, day)
+            -- read file
+            local is_new, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str = m_index_file.getFileDataInfo(fileName)
 
-                -- read file
-                local is_new, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str = m_index_file.getFileDataInfo(fileName)
+            --m_log.info("read_and_index_file_list: total_lines: %s, total_seconds: %s, col_with_data_str: [%s], all_col_str: [%s]", total_lines, total_seconds, col_with_data_str, all_col_str)
+            m_log.info("read_and_index_file_list: total_seconds: %s", total_seconds)
+            m_tables.list_ordered_insert(model_name_list, modelName, compare_names, 2)
+            m_tables.list_ordered_insert(date_list, model_day, compare_dates, 2)
 
-                if total_seconds ~= nil then
-                    --m_log.info("read_and_index_file_list: total_lines: %s, total_seconds: %s, col_with_data_str: [%s]", total_lines, total_seconds, col_with_data_str)
-                    m_log.info("read_and_index_file_list: total_seconds: %s", total_seconds)
-                    if total_seconds > min_log_sec_to_show then
-                        list_ordered_insert(log_file_list, fileName, compare_file_names, 1)
-                        list_ordered_insert(model_name_list, modelName, compare_names, 2)
-                        list_ordered_insert(date_list, model_day, compare_dates, 2)
-                    else
-                        m_log.info("read_files_list: skipping short duration: %dsec, line: [%s]", total_seconds, fileName)
-                    end
-
-                    -- due to cpu load, early exit
-                    if is_new then
-                        return false
-                    end
-                end
-
+            -- due to cpu load, early exit
+            if is_new then
+                return false
             end
         end
 
-
         if log_file_list_raw_idx >= #log_file_list_raw then
-            --m_index_file.indexSave()
             return true
         end
+        :: continue ::
     end
 
     return false
@@ -918,12 +878,10 @@ local function read_and_index_file_list()
 end
 
 local function onLogFileChange(obj)
-    --m_tables.table_print("log_file_list ww", log_file_list)
-    --print("111")
     --m_tables.table_print("log_file_list_filtered", log_file_list_filtered)
-    --print("222")
 
     local i = obj.selected
+    -- Todo: maybe the i is grater then num of fields when paging backward
     --labelDropDown.title = "Selected switch: " .. dropDownItems[i] .. " [" .. dropDownIndices[i] .. "]"
     m_log.info("Selected switch: " .. i)
     m_log.info("Selected switch: " .. log_file_list_filtered[i])
@@ -953,41 +911,48 @@ local function onAccuracyChange(obj)
     end
 end
 
-local function filter_log_file_list(filter_model_name, filter_date)
+local function filter_log_file_list(filter_model_name, filter_date, need_update)
     m_log.info("need to filter by: [%s] [%s]", filter_model_name, filter_date)
 
     m_tables.table_clear(log_file_list_filtered)
 
-    for i = 1, #log_file_list do
-        local ln = log_file_list[i]
+    for i = 1, #m_index_file.log_files_index_info do
+        local log_file_info = m_index_file.log_files_index_info[i]
+
         --m_log.info("filter_log_file_list: %d. %s", i, ln)
 
-        --local is_model_name = (filter_model_name ~= nil) and (string.find(ln, filter_model_name) or string.sub(ln, 1,2)=="--")
-        --local is_date = (filter_date ~= nil) and (string.find(ln, "[" .. filter_date .. "]") or string.sub(ln, 1,2)=="--")
+        local modelName, year, month, day, hour, min, sec, m, d, y = string.match(log_file_info.file_name, "^(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv$")
 
-        local modelName, year, month, day, hour, min, sec, m, d, y = string.match(ln, "^(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv$")
-
-        local is_model_name
+        local is_model_name_ok
         if filter_model_name == nil or string.sub(filter_model_name, 1, 2) == "--" then
-            is_model_name = true
+            is_model_name_ok = true
         else
-            is_model_name = (modelName == filter_model_name)
+            is_model_name_ok = (modelName == filter_model_name)
         end
 
-        local is_date
+        local is_date_ok
         if filter_date == nil or string.sub(filter_date, 1, 2) == "--" then
-            is_date = true
+            is_date_ok = true
         else
             local model_day = string.format("%s-%s-%s", year, month, day)
-            is_date = (model_day == filter_date)
+            is_date_ok = (model_day == filter_date)
         end
 
-        if is_model_name and is_date then
-            m_log.info("[%s] - OK (%s,%s)", ln, filter_model_name, filter_date)
-            table.insert(log_file_list_filtered, ln)
+        local is_duration_ok = true
+        if log_file_info.total_seconds < min_log_sec_to_show then
+            is_duration_ok = false
+        end
+
+        local is_have_data_ok = true
+        if log_file_info.col_with_data_str == nil or log_file_info.col_with_data_str == "" then
+            is_have_data_ok = false
+        end
+
+        if is_model_name_ok and is_date_ok and is_duration_ok and is_have_data_ok then
+            m_log.info("filter_log_file_list: [%s] - OK (%s,%s)", log_file_info.file_name, filter_model_name, filter_date)
+            table.insert(log_file_list_filtered, log_file_info.file_name)
         else
-            print("The word tiger was not found.")
-            m_log.info("[%s] - NOT-FOUND (%s,%s)", ln, filter_model_name, filter_date)
+            m_log.info("filter_log_file_list: [%s] - FILTERED-OUT (%s,%s) (%s,%s,%s,%s)", log_file_info.file_name, filter_model_name, filter_date, is_model_name_ok, is_date_ok, is_duration_ok, is_have_data_ok)
         end
 
     end
@@ -998,8 +963,10 @@ local function filter_log_file_list(filter_model_name, filter_date)
     m_tables.table_print("filter_log_file_list", log_file_list_filtered)
 
     -- update the log combo to first
-    onLogFileChange(ddLogFile)
-    ddLogFile.selected = 1
+    if need_update == true then
+        onLogFileChange(ddLogFile)
+        ddLogFile.selected = 1
+    end
 end
 
 local function state_INIT(event, touchState)
@@ -1014,9 +981,7 @@ end
 
 local function state_SELECT_FILE_init(event, touchState)
     m_tables.table_clear(log_file_list_filtered)
-    for i = 1, #log_file_list do
-        table.insert(log_file_list_filtered, log_file_list[i])
-    end
+    filter_log_file_list(nil, nil, false)
 
     m_log.info("++++++++++++++++++++++++++++++++")
     if ctx1 == nil then
@@ -1026,26 +991,29 @@ local function state_SELECT_FILE_init(event, touchState)
 
         ctx1.label(10, 25, 120, 24, "log file...", BOLD)
 
+        m_log.info("setting model filter...")
         ctx1.label(10, 55, 60, 24, "Model")
         ctx1.dropDown(90, 55, 380, 24, model_name_list, 1,
             function(obj)
                 local i = obj.selected
                 filter_model_name = model_name_list[i]
                 m_log.info("Selected model-name: " .. filter_model_name)
-                filter_log_file_list(filter_model_name, filter_date)
+                filter_log_file_list(filter_model_name, filter_date, true)
             end
         )
 
+        m_log.info("setting date filter...")
         ctx1.label(10, 80, 60, 24, "Date")
         ctx1.dropDown(90, 80, 380, 24, date_list, 1,
             function(obj)
                 local i = obj.selected
                 filter_date = date_list[i]
                 m_log.info("Selected filter_date: " .. filter_date)
-                filter_log_file_list(filter_model_name, filter_date)
+                filter_log_file_list(filter_model_name, filter_date, true)
             end
         )
 
+        m_log.info("setting file combo...")
         ctx1.label(10, 105, 60, 24, "Log file")
         ddLogFile = ctx1.dropDown(90, 105, 380, 24, log_file_list_filtered, filename_idx,
             onLogFileChange
@@ -1055,19 +1023,39 @@ local function state_SELECT_FILE_init(event, touchState)
         ctx1.label(10, 130, 60, 24, "Accuracy")
         dd4 = ctx1.dropDown(90, 130, 380, 24, accuracy_list, 1, onAccuracyChange)
         onAccuracyChange(dd4)
+
     end
 
     state = STATE.SELECT_FILE
     return 0
 end
 
+local function colWithData2ColByHeader(colWithDataId)
+    local sensorName = columns_with_data[colWithDataId]
+    local colByHeaderId = 0
+
+    m_log.info("colWithData2ColByHeader: byData     - idx: %d, name: %s", colWithDataId, sensorName)
+
+    for i = 1, #columns_by_header do
+        if columns_by_header[i] == sensorName then
+            colByHeaderId = i
+            m_log.info("colWithData2ColByHeader: byHeader - colId: %d, name: %s", colByHeaderId, columns_by_header[colByHeaderId])
+            return colByHeaderId
+        end
+    end
+
+    return -1
+end
+
 local function state_SELECT_SENSORS_INIT(event, touchState)
     m_log.info("state_SELECT_SENSORS_INIT")
+    m_tables.table_print("sensors-init columns", columns_with_data)
     for varIndex = 1, 4, 1 do
         sensorSelection[varIndex].values[0] = "---"
-        for i = 2, #columns, 1 do
-            sensorSelection[varIndex].values[i - 1] = columns[i]
+        for i = 2, #columns_with_data, 1 do
+            sensorSelection[varIndex].values[i - 1] = columns_with_data[i]
         end
+        m_tables.table_print("sensors-init sensorSelection", sensorSelection[varIndex].values)
     end
 
     current_option = 1
@@ -1079,47 +1067,57 @@ local function state_SELECT_SENSORS_INIT(event, touchState)
 
         ctx2.label(10, 25, 120, 24, "Select sensors...", BOLD)
 
+        m_log.info("setting field1...")
         --local model_name_list = { "-- all --", "aaa", "bbb", "ccc" }
         --local date_list = { "-- all --", "2017", "2018", "2019" }
         ctx2.label(10, 55, 60, 24, "Field 1")
-        ctx2.dropDown(90, 55, 380, 24, columns, sensorSelection[1].value,
+        ctx2.dropDown(90, 55, 380, 24, columns_with_data, sensorSelection[1].idx,
             function(obj)
                 local i = obj.selected
-                local var1 = columns[i]
+                local var1 = columns_with_data[i]
                 m_log.info("Selected var1: " .. var1)
-                sensorSelection[1].value = i
+                sensorSelection[1].idx = i
+                sensorSelection[1].colId = colWithData2ColByHeader(i)
             end
         )
 
         ctx2.label(10, 80, 60, 24, "Field 2")
-        ctx2.dropDown(90, 80, 380, 24, columns, sensorSelection[2].value,
+        ctx2.dropDown(90, 80, 380, 24, columns_with_data, sensorSelection[2].idx,
             function(obj)
                 local i = obj.selected
-                local var2 = columns[i]
+                local var2 = columns_with_data[i]
                 m_log.info("Selected var2: " .. var2)
-                sensorSelection[2].value = i
+                sensorSelection[2].idx = i
+                sensorSelection[2].colId = colWithData2ColByHeader(i)
             end
         )
 
         ctx2.label(10, 105, 60, 24, "Field 3")
-        ctx2.dropDown(90, 105, 380, 24, columns, sensorSelection[3].value,
+        ctx2.dropDown(90, 105, 380, 24, columns_with_data, sensorSelection[3].idx,
             function(obj)
                 local i = obj.selected
-                local var3 = columns[i]
+                local var3 = columns_with_data[i]
                 m_log.info("Selected var3: " .. var3)
-                sensorSelection[3].value = i
+                sensorSelection[3].idx = i
+                sensorSelection[3].colId = colWithData2ColByHeader(i)
             end
         )
 
         ctx2.label(10, 130, 60, 24, "Field 4")
-        ctx2.dropDown(90, 130, 380, 24, columns, sensorSelection[4].value,
+        ctx2.dropDown(90, 130, 380, 24, columns_with_data, sensorSelection[4].idx,
             function(obj)
                 local i = obj.selected
-                local var4 = columns[i]
+                local var4 = columns_with_data[i]
                 m_log.info("Selected var4: " .. var4)
-                sensorSelection[4].value = i
+                sensorSelection[4].idx = i
+                sensorSelection[4].colId = colWithData2ColByHeader(i)
             end
         )
+
+        sensorSelection[1].colId = colWithData2ColByHeader(sensorSelection[1].idx)
+        sensorSelection[2].colId = colWithData2ColByHeader(sensorSelection[2].idx)
+        sensorSelection[3].colId = colWithData2ColByHeader(sensorSelection[3].idx)
+        sensorSelection[4].colId = colWithData2ColByHeader(sensorSelection[4].idx)
 
     end
 
@@ -1137,7 +1135,7 @@ local function state_SELECT_FILE_refresh(event, touchState)
         heap = 2048 * 12
         --prevTotalSeconds = 0
 
-        local is_new, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str = m_index_file.getFileDataInfo(filename)
+        local is_new, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str = m_index_file.getFileDataInfo(filename)
 
         current_session = {
             startTime = start_time,
@@ -1145,17 +1143,27 @@ local function state_SELECT_FILE_refresh(event, touchState)
             total_seconds = total_seconds,
             total_lines = total_lines,
             startIndex = start_index,
-            col_with_data_str = col_with_data_str
+            col_with_data_str = col_with_data_str,
+            all_col_str = all_col_str
         }
 
         -- update columns
         local columns_temp, cnt = m_utils.split_pipe(col_with_data_str)
         m_log.info("state_SELECT_FILE_refresh: #col: %d", cnt)
-        m_tables.table_clear(columns)
-        columns[1] = "---"
+        m_tables.table_clear(columns_with_data)
+        columns_with_data[1] = "---"
         for i = 1, #columns_temp, 1 do
             local col = columns_temp[i]
-            columns[#columns + 1] = col
+            columns_with_data[#columns_with_data + 1] = col
+            --m_log.info("state_SELECT_FILE_refresh: col: %s", col)
+        end
+
+        local columns_temp, cnt = m_utils.split_pipe(all_col_str)
+        m_log.info("state_SELECT_FILE_refresh: #col: %d", cnt)
+        m_tables.table_clear(columns_by_header)
+        for i = 1, #columns_temp, 1 do
+            local col = columns_temp[i]
+            columns_by_header[#columns_by_header + 1] = col
             --m_log.info("state_SELECT_FILE_refresh: col: %s", col)
         end
 
@@ -1204,32 +1212,6 @@ local function state_SELECT_SENSORS_refresh(event, touchState)
     end
 
     ctx2.run(event, touchState)
-
-    ---- draw sensor grid
-    --local x = 200
-    --local y = 50
-    --local dx = 80
-    --local dy = 25
-    --local iCol = 2
-    --local ix = 0
-    --for iy = 0, 10, 1 do
-    --    if iCol < #columns then
-    --        local col_name = columns[iCol]
-    --        m_log.info("col: %s", columns[i])
-    --        lcd.drawFilledRectangle(x + dx * ix, y + dy * iy, 100, 20, TEXT_INVERTED_BGCOLOR)
-    --        lcd.drawRectangle(x + dx * ix, y + dy * iy, 100, 20, TEXT_COLOR)
-    --        lcd.drawText(x + dx * ix + 5, y + dy * iy, col_name, SMLSIZE + TEXT_COLOR)
-    --        iCol = iCol +1
-    --    end
-    --end
-
-    --for i = 1, #columns, 1 do
-    --    local col_name = columns[i]
-    --    m_log.info("col: %s", columns[i])
-    --    lcd.drawText(x + dx, y + dy, col_name, SMLSIZE + TEXT_COLOR)
-    --    y = y +dy
-    --    dx = math.floor(i / 10)
-    --end
 
     return 0
 end
@@ -1317,8 +1299,8 @@ local function state_PARSE_DATA_refresh(event, touchState)
         graphTimeBase = valPos / fileTime
 
         for varIndex = 1, 4, 1 do
-            if sensorSelection[varIndex].value >= FIRST_VALID_COL then
-                local columnName = columns[sensorSelection[varIndex].value]
+            if sensorSelection[varIndex].idx >= FIRST_VALID_COL then
+                local columnName = columns_with_data[sensorSelection[varIndex].idx]
                 -- remove column units if exist
                 local i = string.find(columnName, "%(")
                 local unit = ""
@@ -1344,13 +1326,13 @@ local function state_PARSE_DATA_refresh(event, touchState)
     end
 
     --
-    if sensorSelection[conversionSensorId].value >= FIRST_VALID_COL then
+    if sensorSelection[conversionSensorId].idx >= FIRST_VALID_COL then
         for i = conversionSensorProgress, valPos - 1, 1 do
             local val = tonumber(_values[conversionSensorId][i])
             _values[conversionSensorId][i] = val
             conversionSensorProgress = conversionSensorProgress + 1
             cnt = cnt + 1
-            --m_log.info(string.format("PARSE_DATA: %d.%s %d min:%d max:%d", conversionSensorId, _points[conversionSensorId].name, #_points[conversionSensorId].points, _points[conversionSensorId].min, _points[conversionSensorId].max))
+            m_log.info(string.format("PARSE_DATA: %d.%s %d min:%d max:%d", conversionSensorId, _points[conversionSensorId].name, #_points[conversionSensorId].points, _points[conversionSensorId].min, _points[conversionSensorId].max))
 
             if val > _points[conversionSensorId].max then
                 _points[conversionSensorId].max = val
@@ -1370,6 +1352,7 @@ local function state_PARSE_DATA_refresh(event, touchState)
         graphStart = 0
         graphSize = valPos
         cursor = 50
+        graphMinMaxEditorIndex = 0
         graphMode = GRAPH_MODE.CURSOR
         state = STATE.SHOW_GRAPH
     else
@@ -1458,32 +1441,28 @@ local function run_GRAPH_Adjust(amount, mode)
         graphSize = math_floor(graphSize)
 
         for varIndex = 1, 4, 1 do
-            if sensorSelection[varIndex].value >= FIRST_VALID_COL then
+            if sensorSelection[varIndex].idx >= FIRST_VALID_COL then
                 _points[varIndex].points = {}
             end
         end
     end
 
     if mode == GRAPH_MODE.MINMAX then
-        local point = _points[(math.floor(graphMinMaxIndex / 2)) + 1]
-
+        local point = _points[(math.floor(graphMinMaxEditorIndex / 2)) + 1]
         local delta = math.floor((point.max - point.min) / 50 * amount)
-
         if amount > 0 and delta < 1 then
             delta = 1
         elseif amount < 0 and delta > -1 then
             delta = -1
         end
 
-        if graphMinMaxIndex % 2 == 0 then
+        if graphMinMaxEditorIndex % 2 == 0 then
             point.max = point.max + delta
-
             if point.max < point.min then
                 point.max = point.min + 1
             end
         else
             point.min = point.min + delta
-
             if point.min > point.max then
                 point.min = point.max - 1
             end
@@ -1506,7 +1485,7 @@ local function run_GRAPH_Adjust(amount, mode)
         graphStart = math_floor(graphStart)
 
         for varIndex = 1, 4, 1 do
-            if sensorSelection[varIndex].value >= FIRST_VALID_COL then
+            if sensorSelection[varIndex].idx >= FIRST_VALID_COL then
                 _points[varIndex].points = {}
             end
         end
@@ -1530,7 +1509,12 @@ local function drawGraph_base()
     --lcd.drawText(LCD_W - 85, LCD_H - 18, "Offer Shmuely", SMLSIZE + GREEN)
 end
 
-local function drawGraph_points(points, min, max)
+local function drawGraph_var_is_visible(varIndex)
+    --m_log.info("drawGraph_var_is_visible: varIndex: %d, ,min: %d, max: %d", varIndex, _points[varIndex].min, _points[varIndex].max)
+    return (sensorSelection[varIndex].idx >= FIRST_VALID_COL) and (_points[varIndex].min ~= 0 or _points[varIndex].max ~= 0)
+end
+
+local function drawGraph_graph_lines_single_line(points, min, max)
     if min == max then
         return
     end
@@ -1560,13 +1544,106 @@ local function drawGraph_points(points, min, max)
     end
 end
 
-local function drawGraph()
+local function drawGraph_graph_lines()
     local skip = graphSize / 101
 
-    lcd.setColor(CUSTOM_COLOR, BLACK)
-    drawGraph_base()
+    for varIndex = 1, 4, 1 do
+        if drawGraph_var_is_visible(varIndex) then
+            local varPoints = _points[varIndex]
+            local varCfg = graphConfig[varIndex]
+            --m_log.info(string.format("drawGraph: %d.%s %d min:%d max:%d", varIndex, varPoints.name, #varPoints.points, varPoints.min, varPoints.max))
+            --m_log.info("drawGraph: %d. %s", varIndex, varPoints.columnName)
+            if #varPoints.points == 0 then
+                for i = 0, 100, 1 do
+                    varPoints.points[i] = _values[varIndex][math_floor(graphStart + (i * skip))]
+                    if varPoints.points[i] == nil then
+                        varPoints.points[i] = 0
+                    end
+                end
+            end
 
-    -- draw cursor
+            -- points
+            lcd.setColor(CUSTOM_COLOR, varCfg.color)
+            drawGraph_graph_lines_single_line(varPoints.points, varPoints.min, varPoints.max)
+
+        end
+    end
+end
+
+local function drawGraph_bottom_session_line()
+    local viewScale = valPos / 479
+    local viewStart = math.floor(graphStart / viewScale)
+    local viewEnd = math.floor((graphStart + graphSize) / viewScale)
+    lcd.drawLine(viewStart, 269, viewEnd, 269, SOLID, RED)
+    lcd.drawLine(viewStart, 270, viewEnd, 270, SOLID, RED)
+    lcd.drawLine(viewStart, 271, viewEnd, 271, SOLID, RED)
+end
+
+local function drawGraph_status_line_values()
+    local curr_status_txt_x = 50
+    for varIndex = 1, 4, 1 do
+        if drawGraph_var_is_visible(varIndex) == false then
+            goto continue -- poor man continue
+        end
+
+        local varPoints = _points[varIndex]
+        local varCfg = graphConfig[varIndex]
+
+        if varPoints.points[cursor] == nil then
+            goto continue -- poor man continue
+        end
+
+        lcd.setColor(CUSTOM_COLOR, varCfg.color)
+
+        -- cursor values & status line values
+        -- status line values
+        local status_txt = varPoints.name .. "=" .. varPoints.points[cursor] .. varPoints.unit
+        local status_txt_w, status_txt_h = lcd.sizeText(status_txt)
+        lcd.drawText(curr_status_txt_x, varCfg.valy, status_txt, CUSTOM_COLOR)
+        curr_status_txt_x = curr_status_txt_x + status_txt_w + 10
+        :: continue ::
+    end
+end
+
+local function drawGraph_min_max()
+    local skip = graphSize / 101
+    for varIndex = 1, 4, 1 do
+        if drawGraph_var_is_visible(varIndex) == false then
+            goto continue -- poor man continue
+        end
+
+        local varPoints = _points[varIndex]
+        local varCfg = graphConfig[varIndex]
+        lcd.setColor(CUSTOM_COLOR, varCfg.color)
+
+        -- draw min/max
+        local minPos = math_floor((varPoints.minpos + 1 - graphStart) / skip)
+        local maxPos = math_floor((varPoints.maxpos + 1 - graphStart) / skip)
+        minPos = math.min(math.max(minPos, 0), 100)
+        maxPos = math.min(math.max(maxPos, 0), 100)
+
+        local x = graphConfig.x_start + (minPos * xStep)
+        lcd.drawLine(x, 240, x, 250, SOLID, CUSTOM_COLOR)
+
+        local x = graphConfig.x_start + (maxPos * xStep)
+        lcd.drawLine(x, 30, x, graphConfig.y_start, SOLID, CUSTOM_COLOR)
+
+        -- draw max
+        lcd.drawFilledRectangle(varCfg.maxx - 5, varCfg.maxy, 35, 14, GREY, 5)
+        lcd.drawText(varCfg.maxx, varCfg.maxy, varPoints.max, SMLSIZE + CUSTOM_COLOR)
+
+        -- draw min
+        lcd.drawFilledRectangle(varCfg.minx - 5, varCfg.miny, 35, 14, GREY, 5)
+        lcd.drawText(varCfg.minx, varCfg.miny, varPoints.min, SMLSIZE + CUSTOM_COLOR)
+
+        :: continue ::
+    end
+end
+
+local function drawGraph_cursor()
+    local skip = graphSize / 101
+
+    ---- draw cursor
     local cursor_x = graphConfig.x_start + (xStep * cursor)
     lcd.drawLine(cursor_x, graphConfig.y_start, cursor_x, graphConfig.y_end, DOTTED, WHITE)
 
@@ -1580,87 +1657,87 @@ local function drawGraph()
     -- draw cursor time
     lcd.drawText(cursor_x, 20, cursorTime, WHITE)
 
-    -- draw bottom session line
-    local viewScale = valPos / 479
-    local viewStart = math.floor(graphStart / viewScale)
-    local viewEnd = math.floor((graphStart + graphSize) / viewScale)
-    lcd.drawLine(viewStart, 269, viewEnd, 269, SOLID, RED)
-    lcd.drawLine(viewStart, 270, viewEnd, 270, SOLID, RED)
-    lcd.drawLine(viewStart, 271, viewEnd, 271, SOLID, RED)
-
-    -- draw all lines
+    -- draw cursor values
     for varIndex = 1, 4, 1 do
-        if (sensorSelection[varIndex].value >= FIRST_VALID_COL) and (_points[varIndex].min ~= 0 or _points[varIndex].max ~= 0) then
+        if drawGraph_var_is_visible(varIndex) == false then
+            goto continue -- poor man continue
+        end
+
+        local varPoints = _points[varIndex]
+        local varCfg = graphConfig[varIndex]
+        lcd.setColor(CUSTOM_COLOR, varCfg.color)
+
+        if varPoints.points[cursor] == nil then
+            goto continue -- poor man continue
+        end
+
+        -- cursor values
+        local yScale = (varPoints.max - varPoints.min) / 200
+        local cursor_y = graphConfig.y_end - ((varPoints.points[cursor] - varPoints.min) / yScale)
+        local x1 = cursor_x + 30
+        local y1 = 120 + 25 * varIndex
+        local v_txt = varPoints.points[cursor] .. varPoints.unit
+        local txt_w, txt_h = lcd.sizeText(v_txt)
+        txt_w = math.max(txt_w, 40)
+
+        --lcd.drawFilledRectangle(x1, y1, 40, 20, CUSTOM_COLOR)
+        lcd.drawFilledRectangle(x1 + 2, y1, txt_w + 4, 19, CUSTOM_COLOR)
+        lcd.drawLine(x1, y1 + 10, cursor_x, cursor_y, DOTTED, CUSTOM_COLOR)
+        lcd.drawFilledCircle(cursor_x, cursor_y, 4, CUSTOM_COLOR)
+        --lcd.drawText(x1 + 40, y1, v_txt, BLACK + RIGHT)
+        lcd.drawText(x1 + 4, y1, v_txt, BLACK)
+
+        :: continue ::
+    end
+end
+
+local function drawGraph_min_max_editor()
+    -- min/max editor
+    for varIndex = 1, 4, 1 do
+        if drawGraph_var_is_visible(varIndex) == true then
             local varPoints = _points[varIndex]
             local varCfg = graphConfig[varIndex]
-            --m_log.info(string.format("drawGraph: %d.%s %d min:%d max:%d", varIndex, varPoints.name, #varPoints.points, varPoints.min, varPoints.max))
-            --m_log.info("drawGraph: %d. %s", varIndex, varPoints.columnName)
-            if #varPoints.points == 0 then
-                for i = 0, 100, 1 do
-                    --print("i:" .. i .. ", skip: " .. skip .. ", result:" .. math_floor(graphStart + (i * skip)))
-                    varPoints.points[i] = _values[varIndex][math_floor(graphStart + (i * skip))]
-                    if varPoints.points[i] == nil then
-                        varPoints.points[i] = 0
-                    end
-                end
-            end
-
-            -- points
             lcd.setColor(CUSTOM_COLOR, varCfg.color)
-            drawGraph_points(varPoints.points, varPoints.min, varPoints.max)
 
-            -- draw min/max
-            local minPos = math_floor((varPoints.minpos + 1 - graphStart) / skip)
-            local maxPos = math_floor((varPoints.maxpos + 1 - graphStart) / skip)
-            minPos = math.min(math.max(minPos, 0), 100)
-            maxPos = math.min(math.max(maxPos, 0), 100)
-
-            local x = graphConfig.x_start + (minPos * xStep)
-            lcd.drawLine(x, 240, x, 250, SOLID, CUSTOM_COLOR)
-
-            local x = graphConfig.x_start + (maxPos * xStep)
-            lcd.drawLine(x, 30, x, graphConfig.y_start, SOLID, CUSTOM_COLOR)
-
-            -- draw max
-            if graphMode == GRAPH_MODE.MINMAX and graphMinMaxIndex == (varIndex - 1) * 2 then
-                local txt = string.format("Max: %d", varPoints.max)
-                local w, h = lcd.sizeText(txt, MIDSIZE)
-                lcd.drawFilledRectangle(varCfg.maxx, varCfg.maxy, w + 4, h, GREY, 3)
-                lcd.drawRectangle(varCfg.maxx, varCfg.maxy, w + 4, h, CUSTOM_COLOR)
-                lcd.drawText(varCfg.maxx, varCfg.maxy, txt, MIDSIZE + CUSTOM_COLOR)
-            else
-                lcd.drawFilledRectangle(varCfg.maxx - 5, varCfg.maxy, 35, 14, GREY, 5)
-                lcd.drawText(varCfg.maxx, varCfg.maxy, varPoints.max, SMLSIZE + CUSTOM_COLOR)
+            -- min/max editor
+            if graphMode ~= GRAPH_MODE.MINMAX then
+                goto continue -- poor man continue
             end
 
-            -- draw min
-            if graphMode == GRAPH_MODE.MINMAX and graphMinMaxIndex == ((varIndex - 1) * 2) + 1 then
-                local txt = string.format("Min: %d", varPoints.min)
-                local w, h = lcd.sizeText(txt, MIDSIZE)
-                lcd.drawFilledRectangle(varCfg.minx, varCfg.miny, w + 4, h, GREY, 5)
-                lcd.drawRectangle(varCfg.minx, varCfg.miny, w + 4, h, CUSTOM_COLOR)
-                lcd.drawText(varCfg.minx, varCfg.miny, txt, MIDSIZE + CUSTOM_COLOR)
-                --lcd.drawText(cfg.minx, cfg.miny, points.min, MIDSIZE + TEXT_INVERTED_COLOR + INVERS)
-            else
-                lcd.drawFilledRectangle(varCfg.minx - 5, varCfg.miny, 35, 14, GREY, 5)
-                lcd.drawText(varCfg.minx, varCfg.miny, varPoints.min, SMLSIZE + CUSTOM_COLOR)
-            end
+            if ((graphMinMaxEditorIndex == (varIndex - 1) * 2) or (graphMinMaxEditorIndex == ((varIndex - 1) * 2) + 1)) then
+                local min_max_prefix
+                local txt
+                if graphMinMaxEditorIndex == (varIndex - 1) * 2 then
+                    min_max_prefix = "Max"
+                    txt = string.format("%d %s", varPoints.max, varPoints.unit)
+                else
+                    txt = string.format("%d %s", varPoints.min, varPoints.unit)
+                    min_max_prefix = "Min"
+                end
 
-            -- col-name and value at cursor
-            if varPoints.points[cursor] ~= nil then
-                lcd.drawText(varCfg.valx, varCfg.valy, varPoints.name .. "=" .. varPoints.points[cursor] .. varPoints.unit, CUSTOM_COLOR)
+                local w, h = lcd.sizeText(txt, MIDSIZE + BOLD)
+                w = math.max(w + 10, 170)
+                local edt_x = 150
+                local edt_y = 100
+                lcd.drawFilledRectangle(edt_x, edt_y, w + 4, h + 30, GREY, 2)
+                lcd.drawRectangle(edt_x, edt_y, w + 4, h + 30, GREY, 0)
 
-                local yScale = (varPoints.max - varPoints.min) / 200
-                local cursor_y = graphConfig.y_end - ((varPoints.points[cursor] - varPoints.min) / yScale)
-                local x1 = cursor_x + 30
-                local y1 = 120 + 25 * varIndex
-                lcd.drawFilledRectangle(x1, y1, 40, 20, CUSTOM_COLOR)
-                lcd.drawLine(x1, y1 + 10, cursor_x, cursor_y, DOTTED, CUSTOM_COLOR)
-                lcd.drawFilledCircle(cursor_x, cursor_y, 4, CUSTOM_COLOR)
-                lcd.drawText(x1 + 40, y1, varPoints.points[cursor] .. varPoints.unit, BLACK + RIGHT)
+                lcd.drawText(edt_x + 5, edt_y + 5, string.format("%s - %s", varPoints.name, min_max_prefix), BOLD + CUSTOM_COLOR)
+                lcd.drawText(edt_x + 5, edt_y + 25, txt, MIDSIZE + BOLD + CUSTOM_COLOR)
             end
         end
+        :: continue ::
     end
+end
+
+local function drawGraph()
+    drawGraph_base()
+    drawGraph_graph_lines()
+    drawGraph_bottom_session_line()
+    drawGraph_status_line_values()
+    drawGraph_min_max()
+    drawGraph_cursor()
+    drawGraph_min_max_editor()
 end
 
 local function state_SHOW_GRAPH_refresh(event, touchState)
@@ -1669,52 +1746,63 @@ local function state_SHOW_GRAPH_refresh(event, touchState)
         return 0
     end
 
-    if graphMode == GRAPH_MODE.MINMAX and event == EVT_PAGEDN_FIRST then
-        graphMinMaxIndex = graphMinMaxIndex + 1
+    --if graphMode == GRAPH_MODE.MINMAX and event == EVT_PAGEDN_FIRST then
+    if graphMode == GRAPH_MODE.MINMAX and event == EVT_ROT_RIGHT then
+        graphMinMaxEditorIndex = graphMinMaxEditorIndex + 1
 
-        if graphMinMaxIndex == 8 then
-            graphMinMaxIndex = 0
+        if graphMinMaxEditorIndex == 8 then
+            graphMinMaxEditorIndex = 0
         end
-        if graphMinMaxIndex == 2 and sensorSelection[2].value == 0 then
-            graphMinMaxIndex = 4
+        if graphMinMaxEditorIndex == 2 and sensorSelection[2].idx == 0 then
+            graphMinMaxEditorIndex = 4
         end
-        if graphMinMaxIndex == 4 and sensorSelection[3].value == 0 then
-            graphMinMaxIndex = 6
+        if graphMinMaxEditorIndex == 4 and sensorSelection[3].idx == 0 then
+            graphMinMaxEditorIndex = 6
         end
-        if graphMinMaxIndex == 6 and sensorSelection[4].value == 0 then
-            graphMinMaxIndex = 0
+        if graphMinMaxEditorIndex == 6 and sensorSelection[4].idx == 0 then
+            graphMinMaxEditorIndex = 0
         end
-        if graphMinMaxIndex == 0 and sensorSelection[1].value == 0 then
-            graphMinMaxIndex = 2
+        if graphMinMaxEditorIndex == 0 and sensorSelection[1].idx == 0 then
+            graphMinMaxEditorIndex = 2
         end
-    elseif graphMode == GRAPH_MODE.MINMAX and event == EVT_PAGEUP_FIRST then
-        graphMinMaxIndex = graphMinMaxIndex - 1
+        --elseif graphMode == GRAPH_MODE.MINMAX and event == EVT_PAGEUP_FIRST then
+    elseif graphMode == GRAPH_MODE.MINMAX and event == EVT_ROT_LEFT then
+        graphMinMaxEditorIndex = graphMinMaxEditorIndex - 1
 
-        if graphMinMaxIndex < 0 then
-            graphMinMaxIndex = 7
+        if graphMinMaxEditorIndex < 0 then
+            graphMinMaxEditorIndex = 7
         end
-        if graphMinMaxIndex == 7 and sensorSelection[4].value == 0 then
-            graphMinMaxIndex = 5
+        if graphMinMaxEditorIndex == 7 and sensorSelection[4].idx == 0 then
+            graphMinMaxEditorIndex = 5
         end
-        if graphMinMaxIndex == 5 and sensorSelection[3].value == 0 then
-            graphMinMaxIndex = 3
+        if graphMinMaxEditorIndex == 5 and sensorSelection[3].idx == 0 then
+            graphMinMaxEditorIndex = 3
         end
-        if graphMinMaxIndex == 3 and sensorSelection[2].value == 0 then
-            graphMinMaxIndex = 1
+        if graphMinMaxEditorIndex == 3 and sensorSelection[2].idx == 0 then
+            graphMinMaxEditorIndex = 1
         end
-        if graphMinMaxIndex == 1 and sensorSelection[1].value == 0 then
-            graphMinMaxIndex = 7
+        if graphMinMaxEditorIndex == 1 and sensorSelection[1].idx == 0 then
+            graphMinMaxEditorIndex = 7
         end
     elseif event == EVT_VIRTUAL_ENTER or event == EVT_ROT_BREAK then
+        -- mode state machine
+        --if graphMode == GRAPH_MODE.CURSOR then
+        --    graphMode = GRAPH_MODE.ZOOM
+        --elseif graphMode == GRAPH_MODE.ZOOM then
+        --    graphMode = GRAPH_MODE.SCROLL
+        --elseif graphMode == GRAPH_MODE.SCROLL then
+        --    graphMode = GRAPH_MODE.MINMAX
+        --else
+        --    graphMode = GRAPH_MODE.CURSOR
+        --end
+
+        -- mode state machine
         if graphMode == GRAPH_MODE.CURSOR then
-            graphMode = GRAPH_MODE.ZOOM
-        elseif graphMode == GRAPH_MODE.ZOOM then
-            graphMode = GRAPH_MODE.SCROLL
-        elseif graphMode == GRAPH_MODE.SCROLL then
             graphMode = GRAPH_MODE.MINMAX
         else
             graphMode = GRAPH_MODE.CURSOR
         end
+
     elseif event == EVT_PLUS_FIRST or event == EVT_ROT_RIGHT or event == EVT_PLUS_REPT then
         run_GRAPH_Adjust(1, graphMode)
     elseif event == EVT_MINUS_FIRST or event == EVT_ROT_LEFT or event == EVT_MINUS_REPT then
@@ -1757,17 +1845,8 @@ local function state_SHOW_GRAPH_refresh(event, touchState)
         run_GRAPH_Adjust(adjust, GRAPH_MODE.CURSOR)
     end
 
-    --adjust = getValue('jsy') / 200
-    --if math.abs(adjust) > 0.5 then
-    --    run_GRAPH_Adjust(adjust, GRAPH_MODE.ZOOM)
-    --end
-
-    --adjust = getValue('jsx') / 200
-    --if math.abs(adjust) > 0.5 then
-    --    run_GRAPH_Adjust(adjust, GRAPH_MODE.SCROLL)
-    --end
-
     drawGraph()
+
     return 0
 end
 
@@ -1829,6 +1908,5 @@ local function run(event, touchState)
     error("Something went wrong with the script!")
     return 2
 end
-
 
 return { init = init, run = run }
