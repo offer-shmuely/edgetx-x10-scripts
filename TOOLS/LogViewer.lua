@@ -1853,7 +1853,7 @@ end
 local function init()
 end
 
-local function run(event, touchState)
+local function main(event, touchState)
     if event == nil then
         error("Cannot be run as a model script!")
         return 2
@@ -1909,4 +1909,4 @@ local function run(event, touchState)
     return 2
 end
 
-return { init = init, run = run }
+return { init = init, run = main }
