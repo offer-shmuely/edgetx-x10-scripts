@@ -1,4 +1,4 @@
-local toolName = "TNS|_Log Viewer v1.3|TNE"
+local toolName = "TNS|Log Viewer v1.4|TNE"
 
 ---- #########################################################################
 ---- #                                                                       #
@@ -19,7 +19,7 @@ local toolName = "TNS|_Log Viewer v1.3|TNE"
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2022
--- ver: 1.3
+-- ver: 1.4
 
 local m_log = {}
 local m_log_parser = {}
@@ -29,10 +29,13 @@ local m_index_file = {}
 
 --function cache
 local math_floor = math.floor
---local math_fmod = math.fmod
+local math_fmod = math.fmod
 local string_gmatch = string.gmatch
---local string_gsub = string.gsub
---local string_len = string.len
+local string_gsub = string.gsub
+local string_len = string.len
+local string_sub = string.sub
+local string_char = string.char
+local string_byte = string.byte
 
 local heap = 2048
 local hFile
@@ -131,17 +134,11 @@ local graphMinMaxEditorIndex = 0
 local img1 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg1.png")
 local img2 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg2.png")
 
---------------------------------------------------------------
--- Return GUI library table
-local libGUI
-local function loadGUI()
-    if not libGUI then
-        -- Loadable code chunk is called immediately and returns libGUI
-        libGUI = loadScript("/SCRIPTS/TOOLS/LogViewer/libgui.lua")
-    end
-    return libGUI()
-end
-local libGUI = loadGUI()
+-- GUI library
+local libGUI = loadScript("/SCRIPTS/TOOLS/LogViewer/libgui.lua")()
+print("libGUI: v" .. libGUI.getVer())
+
+
 
 -- Instantiate a new GUI object
 local ctx1 = nil
@@ -255,7 +252,8 @@ end
 function m_utils.split(text)
     local cnt = 0
     local result = {}
-    for val in string.gmatch(string.gsub(text, ",,", ", ,"), "([^,]+),?") do
+    --for val in string.gmatch(string.gsub(text, ",,", ", ,"), "([^,]+),?") do
+    for val in string_gmatch(string_gsub(text, ",,", ", ,"), "([^,]+),?") do
         cnt = cnt + 1
         result[cnt] = val
     end
@@ -766,12 +764,12 @@ local function collectData()
     for line in string_gmatch(buffer, "([^\n]+)\n") do
         if math.fmod(lines, skipLines) == 0 then
             local vals = m_utils.split(line)
-            m_log.info(string.format("collectData: 1: %s, 2: %s, 3: %s, 4: %s, line: %s", vals[1], vals[2], vals[3], vals[4], line))
+            --m_log.info(string.format("collectData: 1: %s, 2: %s, 3: %s, 4: %s, line: %s", vals[1], vals[2], vals[3], vals[4], line))
 
             for varIndex = 1, 4, 1 do
                 if sensorSelection[varIndex].idx >= FIRST_VALID_COL then
                     local colId = sensorSelection[varIndex].colId
-                    m_log.info(string.format("collectData: varIndex: %d, sensorSelectionId: %d, colId: %d, val: %d", varIndex, sensorSelection[varIndex].colId, colId, vals[colId]))
+                    --m_log.info(string.format("collectData: varIndex: %d, sensorSelectionId: %d, colId: %d, val: %d", varIndex, sensorSelection[varIndex].colId, colId, vals[colId]))
                     _values[varIndex][valPos] = vals[colId]
                 end
             end
@@ -1068,8 +1066,6 @@ local function state_SELECT_SENSORS_INIT(event, touchState)
         ctx2.label(10, 25, 120, 24, "Select sensors...", BOLD)
 
         m_log.info("setting field1...")
-        --local model_name_list = { "-- all --", "aaa", "bbb", "ccc" }
-        --local date_list = { "-- all --", "2017", "2018", "2019" }
         ctx2.label(10, 55, 60, 24, "Field 1")
         ctx2.dropDown(90, 55, 380, 24, columns_with_data, sensorSelection[1].idx,
             function(obj)
@@ -1332,7 +1328,7 @@ local function state_PARSE_DATA_refresh(event, touchState)
             _values[conversionSensorId][i] = val
             conversionSensorProgress = conversionSensorProgress + 1
             cnt = cnt + 1
-            m_log.info(string.format("PARSE_DATA: %d.%s %d min:%d max:%d", conversionSensorId, _points[conversionSensorId].name, #_points[conversionSensorId].points, _points[conversionSensorId].min, _points[conversionSensorId].max))
+            --m_log.info(string.format("PARSE_DATA: %d.%s %d min:%d max:%d", conversionSensorId, _points[conversionSensorId].name, #_points[conversionSensorId].points, _points[conversionSensorId].min, _points[conversionSensorId].max))
 
             if val > _points[conversionSensorId].max then
                 _points[conversionSensorId].max = val
