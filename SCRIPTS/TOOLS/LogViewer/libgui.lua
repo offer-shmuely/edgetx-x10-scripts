@@ -21,6 +21,10 @@
 
 local lib = { }
 
+function lib.getVer()
+    return "1.0.1"
+end
+
 -- Radius of slider dot
 local SLIDER_DOT_RADIUS = 10
 
