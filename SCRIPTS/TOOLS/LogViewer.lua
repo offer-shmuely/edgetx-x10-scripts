@@ -1,4 +1,4 @@
-local toolName = "TNS|Log Viewer v1.4|TNE"
+local toolName = "TNS|Log Viewer v1.5|TNE"
 
 ---- #########################################################################
 ---- #                                                                       #
@@ -19,7 +19,18 @@ local toolName = "TNS|Log Viewer v1.4|TNE"
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2022
--- ver: 1.4
+-- ver: 1.5
+
+
+-- to get help:
+-- change to "ENABLE_LOG_FILE=true"
+-- run the script again,
+-- and send me the log file that will be created
+-- /SCRIPTS/TOOLS/LogViewer/app.log
+local ENABLE_LOG_FILE=false
+
+local error_desc = nil
+
 
 local m_log = {}
 local m_log_parser = {}
@@ -135,8 +146,8 @@ local img1 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg1.png")
 local img2 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg2.png")
 
 -- GUI library
-local libGUI = loadScript("/SCRIPTS/TOOLS/LogViewer/libgui.lua")()
-print("libGUI: v" .. libGUI.getVer())
+--local libGUI = loadScript("/SCRIPTS/TOOLS/LogViewer/libgui.lua")()
+local libGUI = nil
 
 
 
@@ -152,7 +163,7 @@ local ctx2 = nil
 --local m_log = {}
 m_log.log = {
     outfile = "/SCRIPTS/TOOLS/LogViewer/app.log",
-    enable_file = false,
+    enable_file = ENABLE_LOG_FILE,
     level = "info",
 
     -- func
@@ -452,6 +463,7 @@ function m_log_parser.getFileDataInfo(fileName)
             for idxCol = 1, #columns_by_header do
                 local col_name = columns_by_header[idxCol]
                 col_name = string.gsub(col_name, "\n", "")
+                col_name = m_utils.trim_safe(col_name)
                 if columns_is_have_data[idxCol] == true and col_name ~= "Date" and col_name ~= "Time" then
                     columns_with_data[#columns_with_data + 1] = col_name
                     if string.len(col_with_data_str) == 0 then
@@ -501,10 +513,28 @@ function m_log_parser.getFileDataInfo(fileName)
             end
 
             for idxCol = 1, #columns_by_header, 1 do
-                if vals[idxCol] ~= sample_col_data[idxCol] then
+                --if ("Thr" == columns_by_header[idxCol]) then
+                --    m_log.info("find-col-with-d: %d. %s, %s, %s", total_lines, columns_by_header[idxCol], vals[idxCol], sample_col_data[idxCol])
+                --end
+                if  vals[idxCol] ~= sample_col_data[idxCol]
+                    or columns_by_header[idxCol] == "RQLY"
+                    or columns_by_header[idxCol] == "TQLY"
+                    or columns_by_header[idxCol] == "VFR(%)"
+                then
                     columns_is_have_data[idxCol] = true
+                    --if ("Thr" == columns_by_header[idxCol]) then
+                    --    m_log.info("find-col-with-d: %s =true", columns_by_header[idxCol])
+                    --end
                 end
             end
+
+            -- always allow RQLY and TQLY
+            --for idxCol = 1, #columns_by_header, 1 do
+            --    m_log.info("%s: %s\n", columns_by_header[idxCol], "is RQLY")
+            --    if vals[idxCol] ~= "RQLY" or vals[idxCol] ~= "TQLY" then
+            --        columns_is_have_data[idxCol] = true
+            --    end
+            --end
 
             --local buf1 = ""
             --for idxCol = 1, #columns_by_header do
@@ -596,6 +626,14 @@ function m_index_file.indexRead()
         return
     end
 
+    -- check that index file is correct version
+    local api_ver = string.match(data1, "# api_ver=(%d*)")
+    m_log.info("api_ver: %s", api_ver)
+    if api_ver ~= "3" then
+        m_log.info("api_ver of index files is not updated (api_ver=%d)", api_ver)
+        return
+    end
+
     -- get header line
     local headerLine = string.sub(data1, 1, index)
     m_log.info("indexRead: header: %s", headerLine)
@@ -669,7 +707,7 @@ function m_index_file.indexSave()
     local line_format = "%-42s,%-10s,%-10s,%-13s,%-11s,%-11s,%s,   %s\n"
     local headline = string.format(line_format, "file_name", "start_time", "end_time", "total_seconds", "total_lines", "start_index", "col_with_data_str", "all_col_str")
     io.write(hFile, headline)
-    local ver_line = "# api_ver=2\n"
+    local ver_line = "# api_ver=3\n"
     io.write(hFile, ver_line)
 
     --m_index_file.show("log_files_index_info")
@@ -967,7 +1005,63 @@ local function filter_log_file_list(filter_model_name, filter_date, need_update)
     end
 end
 
+local function stop_on_fail(new_error_desc)
+    error_desc = new_error_desc
+    print(error_desc)
+
+    lcd.clear()
+    lcd.drawText(5, 30, "Error:", TEXT_COLOR + BOLD)
+    lcd.drawText(5, 60, error_desc, TEXT_COLOR + BOLD)
+    m_log.info("after assert")
+
+    return 0
+end
+
 local function state_INIT(event, touchState)
+    -- skip if already in error mode
+    if error_desc ~= nil then
+        print(".")
+        return stop_on_fail(error_desc)
+    end
+
+    -- validate bg1
+    local img1 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg1.png")
+    local w, h = Bitmap.getSize(img1)
+    if w == 0 then
+        return stop_on_fail("File not found: /SCRIPTS/TOOLS/LogViewer/bg1.png")
+    end
+    img1 = nil
+
+    -- validate bg2
+    local img2 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg2.png")
+    local w, h = Bitmap.getSize(img2)
+    if w == 0 then
+        return stop_on_fail("File not found: /SCRIPTS/TOOLS/LogViewer/bg2.png")
+    end
+    img2 = nil
+
+    -- validate libgui exist
+    local libGUI_chunk = loadScript("/SCRIPTS/TOOLS/LogViewer/libgui.lua")
+    print("222")
+    if libGUI_chunk == nil then
+        return stop_on_fail("File not found: /SCRIPTS/TOOLS/LogViewer/libgui.lua")
+    end
+
+    -- validate libgui version
+    libGUI = libGUI_chunk()
+    local lib_gui_ver_func = libGUI.getVer
+    if lib_gui_ver_func == nil then
+        return stop_on_fail("incorrect version of file:\n /SCRIPTS/TOOLS/LogViewer/libgui.lua")
+    end
+
+    local lib_gui_ver = libGUI.getVer()
+    print("lib_gui_Ver: " .. lib_gui_ver)
+    if lib_gui_ver ~= "1.0.1" then
+        return stop_on_fail("incorrect version of file:\n /SCRIPTS/TOOLS/LogViewer/libgui.lua (" .. lib_gui_ver .. " <> 1.0.1)")
+    end
+
+
+    -- start init
     local is_done = read_and_index_file_list()
 
     if (is_done == true) then
@@ -1124,6 +1218,12 @@ end
 local function state_SELECT_FILE_refresh(event, touchState)
     -- ## file selected
     if event == EVT_VIRTUAL_NEXT_PAGE then
+        m_log.info("state_SELECT_FILE_refresh --> EVT_VIRTUAL_NEXT_PAGE: filename: %s", filename)
+        if filename == "not found" then
+            m_log.warn("state_SELECT_FILE_refresh: trying to next-page, but no logfile available, ignoring.")
+            return 0
+        end
+
         --Reset file load data
         m_log.info("Reset file load data")
         buffer = ""
@@ -1160,7 +1260,7 @@ local function state_SELECT_FILE_refresh(event, touchState)
         for i = 1, #columns_temp, 1 do
             local col = columns_temp[i]
             columns_by_header[#columns_by_header + 1] = col
-            --m_log.info("state_SELECT_FILE_refresh: col: %s", col)
+            -- m_log.info("state_SELECT_FILE_refresh: col: %s", col)
         end
 
         state = STATE.SELECT_SENSORS_INIT
