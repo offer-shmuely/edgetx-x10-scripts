@@ -1,4 +1,4 @@
-local toolName = "TNS|Log Viewer v1.5|TNE"
+local toolName = "TNS|Log Viewer v1.6|TNE"
 
 ---- #########################################################################
 ---- #                                                                       #
@@ -142,8 +142,8 @@ local graphSize = 0
 local graphTimeBase = 0
 local graphMinMaxEditorIndex = 0
 
-local img1 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg1.png")
-local img2 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg2.png")
+local img_bg1 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg1.png")
+local img_bg2 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg2.png")
 
 -- GUI library
 --local libGUI = loadScript("/SCRIPTS/TOOLS/LogViewer/libgui.lua")()
@@ -517,24 +517,21 @@ function m_log_parser.getFileDataInfo(fileName)
                 --    m_log.info("find-col-with-d: %d. %s, %s, %s", total_lines, columns_by_header[idxCol], vals[idxCol], sample_col_data[idxCol])
                 --end
                 if  vals[idxCol] ~= sample_col_data[idxCol]
-                    or columns_by_header[idxCol] == "RQLY"
-                    or columns_by_header[idxCol] == "TQLY"
-                    or columns_by_header[idxCol] == "VFR(%)"
+                    or columns_by_header[idxCol] == "RQLY"   -- always show
+                    or columns_by_header[idxCol] == "TQLY"   -- always show
+                    or columns_by_header[idxCol] == "VFR(%)" -- always show
                 then
-                    columns_is_have_data[idxCol] = true
-                    --if ("Thr" == columns_by_header[idxCol]) then
-                    --    m_log.info("find-col-with-d: %s =true", columns_by_header[idxCol])
-                    --end
+                    if  columns_by_header[idxCol] ~= "GPS"     -- always ignore
+                        and columns_by_header[idxCol] ~= "LSW" -- always ignore
+                    then
+                        columns_is_have_data[idxCol] = true
+                        --if ("Thr" == columns_by_header[idxCol]) then
+                        --    m_log.info("find-col-with-d: %s =true", columns_by_header[idxCol])
+                        --end
+
+                    end
                 end
             end
-
-            -- always allow RQLY and TQLY
-            --for idxCol = 1, #columns_by_header, 1 do
-            --    m_log.info("%s: %s\n", columns_by_header[idxCol], "is RQLY")
-            --    if vals[idxCol] ~= "RQLY" or vals[idxCol] ~= "TQLY" then
-            --        columns_is_have_data[idxCol] = true
-            --    end
-            --end
 
             --local buf1 = ""
             --for idxCol = 1, #columns_by_header do
@@ -1025,20 +1022,16 @@ local function state_INIT(event, touchState)
     end
 
     -- validate bg1
-    local img1 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg1.png")
-    local w, h = Bitmap.getSize(img1)
-    if w == 0 then
+    local w, h = Bitmap.getSize(img_bg1)
+    if w == 0 and h == 0  then
         return stop_on_fail("File not found: /SCRIPTS/TOOLS/LogViewer/bg1.png")
     end
-    img1 = nil
 
     -- validate bg2
-    local img2 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg2.png")
-    local w, h = Bitmap.getSize(img2)
-    if w == 0 then
+    w, h = Bitmap.getSize(img_bg2)
+    if w == 0 and h == 0 then
         return stop_on_fail("File not found: /SCRIPTS/TOOLS/LogViewer/bg2.png")
     end
-    img2 = nil
 
     -- validate libgui exist
     local libGUI_chunk = loadScript("/SCRIPTS/TOOLS/LogViewer/libgui.lua")
@@ -1428,7 +1421,7 @@ local function state_PARSE_DATA_refresh(event, touchState)
             _values[conversionSensorId][i] = val
             conversionSensorProgress = conversionSensorProgress + 1
             cnt = cnt + 1
-            --m_log.info(string.format("PARSE_DATA: %d.%s %d min:%d max:%d", conversionSensorId, _points[conversionSensorId].name, #_points[conversionSensorId].points, _points[conversionSensorId].min, _points[conversionSensorId].max))
+            --m_log.info("PARSE_DATA: %d. %s %d %d min:%d max:%d", conversionSensorId, _points[conversionSensorId].name, val, #_points[conversionSensorId].points, _points[conversionSensorId].min, _points[conversionSensorId].max)
 
             if val > _points[conversionSensorId].max then
                 _points[conversionSensorId].max = val
@@ -1466,14 +1459,14 @@ local function drawMain()
     if state == STATE.SHOW_GRAPH then
         --    lcd.drawFilledRectangle(0, 0, LCD_W, LCD_H, BLACK)
         --lcd.drawText(LCD_W - 85, LCD_H - 18, "Offer Shmuely", SMLSIZE + GREEN)
-        lcd.drawBitmap(img2, 0, 0)
+        lcd.drawBitmap(img_bg2, 0, 0)
     else
         -- lcd.drawFilledRectangle(0, 0, LCD_W, LCD_H, WHITE)
 
         -- draw top-bar
         lcd.drawFilledRectangle(0, 0, LCD_W, 20, TITLE_BGCOLOR)
         --lcd.drawText(LCD_W - 95, LCD_H - 18, "Offer Shmuely", SMLSIZE)
-        lcd.drawBitmap(img1, 0, 0)
+        lcd.drawBitmap(img_bg1, 0, 0)
     end
 
     --draw top-bar
