@@ -19,7 +19,7 @@ local toolName = "TNS|Log Viewer v1.7|TNE"
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2022
--- ver: 1.5
+-- ver: 1.7
 
 
 -- to get help:
@@ -263,7 +263,6 @@ end
 function m_utils.split(text)
     local cnt = 0
     local result = {}
-    --for val in string.gmatch(string.gsub(text, ",,", ", ,"), "([^,]+),?") do
     for val in string_gmatch(string_gsub(text, ",,", ", ,"), "([^,]+),?") do
         cnt = cnt + 1
         result[cnt] = val
