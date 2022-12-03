@@ -1,4 +1,4 @@
-local toolName = "TNS|Log Viewer v1.6|TNE"
+local toolName = "TNS|Log Viewer v1.7|TNE"
 
 ---- #########################################################################
 ---- #                                                                       #
@@ -516,21 +516,26 @@ function m_log_parser.getFileDataInfo(fileName)
                 --if ("Thr" == columns_by_header[idxCol]) then
                 --    m_log.info("find-col-with-d: %d. %s, %s, %s", total_lines, columns_by_header[idxCol], vals[idxCol], sample_col_data[idxCol])
                 --end
-                if  vals[idxCol] ~= sample_col_data[idxCol]
-                    or columns_by_header[idxCol] == "RQLY"   -- always show
-                    or columns_by_header[idxCol] == "TQLY"   -- always show
-                    or columns_by_header[idxCol] == "VFR(%)" -- always show
-                then
-                    if  columns_by_header[idxCol] ~= "GPS"     -- always ignore
-                        and columns_by_header[idxCol] ~= "LSW" -- always ignore
-                    then
-                        columns_is_have_data[idxCol] = true
-                        --if ("Thr" == columns_by_header[idxCol]) then
-                        --    m_log.info("find-col-with-d: %s =true", columns_by_header[idxCol])
-                        --end
 
-                    end
+                local have_data = vals[idxCol] ~= sample_col_data[idxCol]
+
+                -- always show
+                if columns_by_header[idxCol] == "RQly(%)" then have_data = true end
+                if columns_by_header[idxCol] == "TQly(%)" then have_data = true end
+                if columns_by_header[idxCol] == "VFR(%)"  then have_data = true end
+
+                -- always ignore
+                if columns_by_header[idxCol] == "GPS"     then have_data = false end
+                if columns_by_header[idxCol] == "LSW"     then have_data = false end
+
+                if have_data then
+                    columns_is_have_data[idxCol] = true
+                    --if ("Thr" == columns_by_header[idxCol]) then
+                    --    m_log.info("find-col-with-d: %s =true", columns_by_header[idxCol])
+                    --end
+                    --m_log.info("find-col-with-d: %s=true", columns_by_header[idxCol])
                 end
+
             end
 
             --local buf1 = ""
@@ -952,7 +957,7 @@ local function filter_log_file_list(filter_model_name, filter_date, need_update)
     for i = 1, #m_index_file.log_files_index_info do
         local log_file_info = m_index_file.log_files_index_info[i]
 
-        --m_log.info("filter_log_file_list: %d. %s", i, ln)
+        --m_log.info("filter_log_file_list: %d. %s", i, log_file_info.file_name)
 
         local modelName, year, month, day, hour, min, sec, m, d, y = string.match(log_file_info.file_name, "^(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv$")
 
@@ -985,7 +990,7 @@ local function filter_log_file_list(filter_model_name, filter_date, need_update)
             m_log.info("filter_log_file_list: [%s] - OK (%s,%s)", log_file_info.file_name, filter_model_name, filter_date)
             table.insert(log_file_list_filtered, log_file_info.file_name)
         else
-            m_log.info("filter_log_file_list: [%s] - FILTERED-OUT (%s,%s) (%s,%s,%s,%s)", log_file_info.file_name, filter_model_name, filter_date, is_model_name_ok, is_date_ok, is_duration_ok, is_have_data_ok)
+            m_log.info("filter_log_file_list: [%s] - FILTERED-OUT (filters:%s,%s) (model_name_ok:%s,date_ok:%s,duration_ok:%s,have_data_ok:%s)", log_file_info.file_name, filter_model_name, filter_date, is_model_name_ok, is_date_ok, is_duration_ok, is_have_data_ok)
         end
 
     end
