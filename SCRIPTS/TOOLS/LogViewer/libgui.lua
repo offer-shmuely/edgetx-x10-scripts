@@ -2,8 +2,8 @@
 -- The dynamically loadable part of the shared Lua GUI library.          --
 --                                                                       --
 -- Author:  Jesper Frickmann                                             --
--- Date:    2022-05-05                                                   --
--- Version: 1.0.1                                                        --
+-- Date:    2022-11-20                                                   --
+-- Version: 1.0.2                                                        --
 --                                                                       --
 -- Copyright (C) EdgeTX                                                  --
 --                                                                       --
@@ -22,7 +22,7 @@
 local lib = { }
 
 function lib.getVer()
-    return "1.0.1"
+    return "1.0.2"
 end
 
 -- Radius of slider dot
@@ -295,6 +295,10 @@ function lib.newGUI()
           if event == EVT_VIRTUAL_ENTER then
             event = EVT_TOUCH_TAP
           end
+        end
+        -- ETX 2.8 rc 4 bug fix
+        if scrolling and event == EVT_VIRTUAL_ENTER_LONG then
+            return
         end
         -- If we put a finger down on a menu item and immediately slide, then we can scroll
         if event == EVT_TOUCH_SLIDE then
@@ -624,7 +628,6 @@ function lib.newGUI()
 
       if focused and gui.editing then
         bgColor = lib.colors.edit
-        --selected = self.selected -- ???
       else
         selected = self.selected
         bgColor = lib.colors.focus
