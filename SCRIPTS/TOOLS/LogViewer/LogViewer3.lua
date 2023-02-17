@@ -1,3 +1,5 @@
+local my_loading_flag = ...
+
 local M = {}
 
 ---- #########################################################################
@@ -18,8 +20,8 @@ local M = {}
 -- This script display a log file as a graph
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
--- Date: 2022
-local ver = "1.8"
+-- Date: 2023
+local ver = "1.9"
 
 function M.getVer()
     return ver
@@ -34,12 +36,12 @@ local app_name = "LogViewer"
 --local m_index_file = require("LogViewer/lib_file_index")
 --local m_libgui = require("LogViewer/libgui")
 
-m_log = loadScript("/SCRIPTS/TOOLS/LogViewer/lib_log", my_loading_flag)(app_name, "/SCRIPTS/TOOLS/" .. app_name)
-m_lib_file_parser = loadScript("/SCRIPTS/TOOLS/LogViewer/lib_file_parser", my_loading_flag)()
-m_utils = loadScript("/SCRIPTS/TOOLS/LogViewer/lib_utils", my_loading_flag)()
-m_tables = loadScript("/SCRIPTS/TOOLS/LogViewer/lib_tables", my_loading_flag)()
-m_index_file = loadScript("/SCRIPTS/TOOLS/LogViewer/lib_file_index", my_loading_flag)()
-m_libgui = loadScript("/SCRIPTS/TOOLS/LogViewer/libgui", my_loading_flag)()
+local m_log = loadScript("/SCRIPTS/TOOLS/LogViewer/lib_log", my_loading_flag)(app_name, "/SCRIPTS/TOOLS/" .. app_name)
+local m_utils = loadScript("/SCRIPTS/TOOLS/LogViewer/lib_utils", my_loading_flag)(m_log, app_name)
+local m_tables = loadScript("/SCRIPTS/TOOLS/LogViewer/lib_tables", my_loading_flag)(m_log, app_name)
+local m_lib_file_parser = loadScript("/SCRIPTS/TOOLS/LogViewer/lib_file_parser", my_loading_flag)(m_log, app_name, m_utils)
+local m_index_file = loadScript("/SCRIPTS/TOOLS/LogViewer/lib_file_index", my_loading_flag)(m_log, app_name, m_utils, m_tables, m_lib_file_parser)
+local m_libgui = loadScript("/SCRIPTS/TOOLS/LogViewer/libgui", my_loading_flag)(m_log, app_name)
 
 --function cache
 local math_floor = math.floor
@@ -61,10 +63,13 @@ local log_file_list_raw_idx = -1
 
 local log_file_list_filtered = {}
 local filter_model_name
+local filter_model_name_idx = 1
 local filter_date
+local filter_date_idx = 1
 local model_name_list = { "-- all --" }
 local date_list = { "-- all --" }
 local accuracy_list = { "1/1 (read every line)", "1/2 (every 2nd line)", "1/5 (every 5th line)", "1/10 (every 10th line)" }
+local ddModel = nil
 local ddLogFile = nil -- log-file dropDown object
 
 local filename
@@ -77,20 +82,21 @@ local FIRST_VALID_COL = 2
 
 -- state machine
 local STATE = {
-    INIT = 0,
-    SELECT_FILE_INIT = 1,
-    SELECT_FILE = 2,
+    SPLASH = 0,
+    INIT = 1,
+    SELECT_FILE_INIT = 2,
+    SELECT_FILE = 3,
 
-    SELECT_SENSORS_INIT = 3,
-    SELECT_SENSORS = 4,
+    SELECT_SENSORS_INIT = 4,
+    SELECT_SENSORS = 5,
 
-    READ_FILE_DATA = 5,
-    PARSE_DATA = 6,
+    READ_FILE_DATA = 6,
+    PARSE_DATA = 7,
 
-    SHOW_GRAPH = 7
+    SHOW_GRAPH = 8
 }
 
-local state = STATE.INIT
+local state = STATE.SPLASH
 --Graph data
 local _values = {}
 local _points = {}
@@ -147,12 +153,12 @@ local graphMinMaxEditorIndex = 0
 
 local img_bg1 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg1.png")
 local img_bg2 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg2.png")
+local img_bg3 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg3.png")
 
 -- Instantiate a new GUI object
 local ctx1 = m_libgui.newGUI()
 local ctx2 = m_libgui.newGUI()
 local select_file_gui_init = false
-local select_sensors_gui_init = false
 
 ---- #########################################################################
 
@@ -172,20 +178,6 @@ local function toDuration1(totalSeconds)
     local seconds = totalSeconds - (minutes * 60)
 
     return doubleDigits(hours) .. ":" .. doubleDigits(minutes) .. ":" .. doubleDigits(seconds);
-end
-
-local function toDuration2(totalSeconds)
-    local minutes = math_floor(totalSeconds / 60)
-    local seconds = totalSeconds - (minutes * 60)
-
-    return doubleDigits(minutes) .. "." .. doubleDigits(seconds) .. "min";
-end
-
-local function getTotalSeconds(time)
-    local total = tonumber(string.sub(time, 1, 2)) * 3600
-    total = total + tonumber(string.sub(time, 4, 5)) * 60
-    total = total + tonumber(string.sub(time, 7, 8))
-    return total
 end
 
 local function collectData()
@@ -263,9 +255,9 @@ local function compare_names(a, b)
     return a < b
 end
 
-local function drawProgress(y, current, total)
+local function drawProgress(x, y, current, total)
     --m_log.info(string.format("drawProgress(%d. %d, %d)", y, current, total))
-    local x = 140
+    --local x = 140
     local pct = current / total
     lcd.drawFilledRectangle(x + 1, y + 1, (470 - x - 2) * pct, 14, TEXT_INVERTED_BGCOLOR)
     lcd.drawRectangle(x, y, 470 - x, 16, TEXT_COLOR)
@@ -294,17 +286,25 @@ local function read_and_index_file_list()
 
     for i = 1, 10, 1 do
         log_file_list_raw_idx = log_file_list_raw_idx + 1
-        local fileName = log_file_list_raw[log_file_list_raw_idx]
-        if fileName ~= nil then
+        local filename = log_file_list_raw[log_file_list_raw_idx]
+        if filename ~= nil then
+
+            -- draw top-bar
             lcd.clear()
+            lcd.drawFilledRectangle(0, 0, LCD_W, 20, TITLE_BGCOLOR)
+            lcd.drawBitmap(img_bg2, 0, 0)
+
+            -- draw state
             lcd.drawText(5, 30, "Analyzing & indexing files", TEXT_COLOR + BOLD)
             lcd.drawText(5, 60, string.format("indexing files: (%d/%d)", log_file_list_raw_idx, #log_file_list_raw), TEXT_COLOR + SMLSIZE)
-            lcd.drawText(5, 90, string.format("* %s", fileName), TEXT_COLOR + SMLSIZE)
-            drawProgress(60, log_file_list_raw_idx, #log_file_list_raw)
+            lcd.drawText(5, 90, string.format("* %s", filename), TEXT_COLOR + SMLSIZE)
+            lcd.drawText(30, 1, "/LOGS/" .. filename, WHITE + SMLSIZE)
 
-            m_log.info("log file: (%d/%d) %s (detecting...)", log_file_list_raw_idx, #log_file_list_raw, fileName)
+            drawProgress(160, 60, log_file_list_raw_idx, #log_file_list_raw)
 
-            local modelName, year, month, day, hour, min, sec, m, d, y = string.match(fileName, "^(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv$")
+            m_log.info("log file: (%d/%d) %s (detecting...)", log_file_list_raw_idx, #log_file_list_raw, filename)
+
+            local modelName, year, month, day, hour, min, sec, m, d, y = string.match(filename, "^(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv$")
             if modelName == nil then
                 goto continue
             end
@@ -312,7 +312,7 @@ local function read_and_index_file_list()
             local model_day = string.format("%s-%s-%s", year, month, day)
 
             -- read file
-            local is_new, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str = m_index_file.getFileDataInfo(fileName)
+            local is_new, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str = m_index_file.getFileDataInfo(filename)
 
             --m_log.info("read_and_index_file_list: total_lines: %s, total_seconds: %s, col_with_data_str: [%s], all_col_str: [%s]", total_lines, total_seconds, col_with_data_str, all_col_str)
             m_log.info("read_and_index_file_list: total_seconds: %s", total_seconds)
@@ -351,7 +351,7 @@ end
 
 local function onAccuracyChange(obj)
     local i = obj.selected
-    accuracy = i
+    local accuracy = i
     m_log.info("Selected accuracy: %s (%d)", accuracy_list[i], i)
 
     if accuracy == 4 then
@@ -427,6 +427,23 @@ local function filter_log_file_list(filter_model_name, filter_date, need_update)
     end
 end
 
+local splash_start_time = 0
+local function state_SPLASH(event, touchState)
+
+    if splash_start_time == 0 then
+        splash_start_time = getTime()
+    end
+    local elapsed = getTime() - splash_start_time;
+    m_log.info('elapsed: %d (t.durationMili: %d)', elapsed, splash_start_time)
+    local elapsedMili = elapsed * 10;
+    -- was 1500, but most the time will go anyway from the load of the scripts
+    if (elapsedMili >= 500) then
+        state = STATE.INIT
+    end
+
+    return 0
+end
+
 local function state_INIT(event, touchState)
     -- start init
     local is_done = read_and_index_file_list()
@@ -455,10 +472,11 @@ local function state_SELECT_FILE_init(event, touchState)
 
         m_log.info("setting model filter...")
         ctx1.label(10, 55, 60, 24, "Model")
-        ctx1.dropDown(90, 55, 380, 24, model_name_list, 1,
+        ddModel = ctx1.dropDown(90, 55, 380, 24, model_name_list, 1,
             function(obj)
                 local i = obj.selected
                 filter_model_name = model_name_list[i]
+                filter_model_name_idx = i
                 m_log.info("Selected model-name: " .. filter_model_name)
                 filter_log_file_list(filter_model_name, filter_date, true)
             end
@@ -470,6 +488,7 @@ local function state_SELECT_FILE_init(event, touchState)
             function(obj)
                 local i = obj.selected
                 filter_date = date_list[i]
+                filter_date_idx = i
                 m_log.info("Selected filter_date: " .. filter_date)
                 filter_log_file_list(filter_model_name, filter_date, true)
             end
@@ -487,6 +506,15 @@ local function state_SELECT_FILE_init(event, touchState)
         onAccuracyChange(dd4)
 
     end
+
+    --filter_model_name_i
+    ddModel.selected = filter_model_name_idx
+    --filter_date_i
+    --ddLogFile.selected = filename_idx
+    filter_log_file_list(filter_model_name, filter_date, true)
+
+    ddLogFile.selected = filename_idx
+
 
     state = STATE.SELECT_FILE
     return 0
@@ -510,42 +538,6 @@ local function colWithData2ColByHeader(colWithDataId)
     return -1
 end
 
-local function select_sensors_preset_first_4bb()
-    for varIndex = 1, 4, 1 do
-        sensorSelection[varIndex].idx = 1
-        sensorSelection[varIndex].values[0] = "---"
-    end
-
-    for i = 1, 4, 1 do
-        m_log.info("state_SELECT_SENSORS_INIT %d. <= %d (%d)", i , sensorSelection[i].idx, #columns_with_data)
-    end
-
-    local varIndex = 0
-    for i = 1, #columns_with_data -1, 1 do
-        m_log.info("%d. sensors is: %s", i, columns_with_data[i])
-        varIndex = varIndex +1
-        sensorSelection[varIndex].idx = i + 1
-        sensorSelection[varIndex].values[i - 1] = columns_with_data[i]
-        m_log.info("state_SELECT_SENSORS_INIT %d. <= %d (%d)", i , sensorSelection[varIndex].idx, #columns_with_data)
-
-        if varIndex > 4 then
-            for i = 1, 4, 1 do
-                m_log.info("state_SELECT_SENSORS_INIT %d. <= %d (%d)", i , sensorSelection[i].idx, #columns_with_data)
-            end
-            return
-        end
-    end
-
-    for i = 1, 4, 1 do
-        m_log.info("state_SELECT_SENSORS_INIT %d. <= %d (%d)", i , sensorSelection[i].idx, #columns_with_data)
-    end
-    return
-
-end
-
-local function select_sensors_preset_rf()
-
-end
 local function select_sensors_preset_first_4()
     for i = 1, 4, 1 do
         if i < #columns_with_data then
@@ -571,64 +563,62 @@ local function state_SELECT_SENSORS_INIT(event, touchState)
 
     current_option = 1
 
-    if select_sensors_gui_init == false then
-        -- creating new window gui
-        select_sensors_gui_init = true
-        m_log.info("creating new window gui")
+    -- creating new window gui
+    m_log.info("creating new window gui")
+    ctx2 = nil
+    ctx2 = m_libgui.newGUI()
 
-        ctx2.label(10, 25, 120, 24, "Select sensors...", BOLD)
+    ctx2.label(10, 25, 120, 24, "Select sensors...", BOLD)
 
-        m_log.info("setting field1...")
-        ctx2.label(10, 55, 60, 24, "Field 1")
-        ctx2.dropDown(90, 55, 380, 24, columns_with_data, sensorSelection[1].idx,
-            function(obj)
-                local i = obj.selected
-                local var1 = columns_with_data[i]
-                m_log.info("Selected var1: " .. var1)
-                sensorSelection[1].idx = i
-                sensorSelection[1].colId = colWithData2ColByHeader(i)
-            end
-        )
+    m_log.info("setting field1...")
+    ctx2.label(10, 55, 60, 24, "Field 1")
+    ctx2.dropDown(90, 55, 380, 24, columns_with_data, sensorSelection[1].idx,
+        function(obj)
+            local i = obj.selected
+            local var1 = columns_with_data[i]
+            m_log.info("Selected var1: " .. var1)
+            sensorSelection[1].idx = i
+            sensorSelection[1].colId = colWithData2ColByHeader(i)
+        end
+    )
 
-        ctx2.label(10, 80, 60, 24, "Field 2")
-        ctx2.dropDown(90, 80, 380, 24, columns_with_data, sensorSelection[2].idx,
-            function(obj)
-                local i = obj.selected
-                local var2 = columns_with_data[i]
-                m_log.info("Selected var2: " .. var2)
-                sensorSelection[2].idx = i
-                sensorSelection[2].colId = colWithData2ColByHeader(i)
-            end
-        )
+    ctx2.label(10, 80, 60, 24, "Field 2")
+    ctx2.dropDown(90, 80, 380, 24, columns_with_data, sensorSelection[2].idx,
+        function(obj)
+            local i = obj.selected
+            local var2 = columns_with_data[i]
+            m_log.info("Selected var2: " .. var2)
+            sensorSelection[2].idx = i
+            sensorSelection[2].colId = colWithData2ColByHeader(i)
+        end
+    )
 
-        ctx2.label(10, 105, 60, 24, "Field 3")
-        ctx2.dropDown(90, 105, 380, 24, columns_with_data, sensorSelection[3].idx,
-            function(obj)
-                local i = obj.selected
-                local var3 = columns_with_data[i]
-                m_log.info("Selected var3: " .. var3)
-                sensorSelection[3].idx = i
-                sensorSelection[3].colId = colWithData2ColByHeader(i)
-            end
-        )
+    ctx2.label(10, 105, 60, 24, "Field 3")
+    ctx2.dropDown(90, 105, 380, 24, columns_with_data, sensorSelection[3].idx,
+        function(obj)
+            local i = obj.selected
+            local var3 = columns_with_data[i]
+            m_log.info("Selected var3: " .. var3)
+            sensorSelection[3].idx = i
+            sensorSelection[3].colId = colWithData2ColByHeader(i)
+        end
+    )
 
-        ctx2.label(10, 130, 60, 24, "Field 4")
-        ctx2.dropDown(90, 130, 380, 24, columns_with_data, sensorSelection[4].idx,
-            function(obj)
-                local i = obj.selected
-                local var4 = columns_with_data[i]
-                m_log.info("Selected var4: " .. var4)
-                sensorSelection[4].idx = i
-                sensorSelection[4].colId = colWithData2ColByHeader(i)
-            end
-        )
+    ctx2.label(10, 130, 60, 24, "Field 4")
+    ctx2.dropDown(90, 130, 380, 24, columns_with_data, sensorSelection[4].idx,
+        function(obj)
+            local i = obj.selected
+            local var4 = columns_with_data[i]
+            m_log.info("Selected var4: " .. var4)
+            sensorSelection[4].idx = i
+            sensorSelection[4].colId = colWithData2ColByHeader(i)
+        end
+    )
 
-        sensorSelection[1].colId = colWithData2ColByHeader(sensorSelection[1].idx)
-        sensorSelection[2].colId = colWithData2ColByHeader(sensorSelection[2].idx)
-        sensorSelection[3].colId = colWithData2ColByHeader(sensorSelection[3].idx)
-        sensorSelection[4].colId = colWithData2ColByHeader(sensorSelection[4].idx)
-
-    end
+    sensorSelection[1].colId = colWithData2ColByHeader(sensorSelection[1].idx)
+    sensorSelection[2].colId = colWithData2ColByHeader(sensorSelection[2].idx)
+    sensorSelection[3].colId = colWithData2ColByHeader(sensorSelection[3].idx)
+    sensorSelection[4].colId = colWithData2ColByHeader(sensorSelection[4].idx)
 
     state = STATE.SELECT_SENSORS
     return 0
@@ -693,31 +683,6 @@ local function state_SELECT_FILE_refresh(event, touchState)
         return 0
     end
 
-    -- --color test
-    --local dx = 250
-    --local dy = 50
-    --lcd.drawText(dx, dy, "COLOR_THEME_PRIMARY1", COLOR_THEME_PRIMARY1)
-    --dy = dy +20
-    --lcd.drawText(dx, dy, "COLOR_THEME_PRIMARY2", COLOR_THEME_PRIMARY2)
-    --dy = dy +20
-    --lcd.drawText(dx, dy, "COLOR_THEME_PRIMARY3", COLOR_THEME_PRIMARY3)
-    --dy = dy +20
-    --lcd.drawText(dx, dy, "COLOR_THEME_SECONDARY1", COLOR_THEME_SECONDARY1)
-    --dy = dy +20
-    --lcd.drawText(dx, dy, "COLOR_THEME_SECONDARY2", COLOR_THEME_SECONDARY2)
-    --dy = dy +20
-    --lcd.drawText(dx, dy, "COLOR_THEME_SECONDARY3", COLOR_THEME_SECONDARY3)
-    --dy = dy +20
-    --lcd.drawText(dx, dy, "COLOR_THEME_FOCUS", COLOR_THEME_FOCUS)
-    --dy = dy +20
-    --lcd.drawText(dx, dy, "COLOR_THEME_EDIT", COLOR_THEME_EDIT)
-    --dy = dy +20
-    --lcd.drawText(dx, dy, "COLOR_THEME_ACTIVE", COLOR_THEME_ACTIVE)
-    --dy = dy +20
-    --lcd.drawText(dx, dy, "COLOR_THEME_WARNING", COLOR_THEME_WARNING)
-    --dy = dy +20
-    --lcd.drawText(dx, dy, "COLOR_THEME_DISABLED", COLOR_THEME_DISABLED)
-
     ctx1.run(event, touchState)
 
     return 0
@@ -743,7 +708,7 @@ local function display_read_data_progress(conversionSensorId, conversionSensorPr
     lcd.drawText(5, 25, "Reading data from file...", TEXT_COLOR)
 
     lcd.drawText(5, 60, "Reading line: " .. lines, TEXT_COLOR)
-    drawProgress(60, lines, current_session.total_lines)
+    drawProgress(140, 60, lines, current_session.total_lines)
 
     local done_var_1 = 0
     local done_var_2 = 0
@@ -770,16 +735,16 @@ local function display_read_data_progress(conversionSensorId, conversionSensorPr
     local y = 85
     local dy = 25
     lcd.drawText(5, y, "Parsing Field 1: ", TEXT_COLOR)
-    drawProgress(y, done_var_1, valPos)
+    drawProgress(140, y, done_var_1, valPos)
     y = y + dy
     lcd.drawText(5, y, "Parsing Field 2: ", TEXT_COLOR)
-    drawProgress(y, done_var_2, valPos)
+    drawProgress(140, y, done_var_2, valPos)
     y = y + dy
     lcd.drawText(5, y, "Parsing Field 3: ", TEXT_COLOR)
-    drawProgress(y, done_var_3, valPos)
+    drawProgress(140, y, done_var_3, valPos)
     y = y + dy
     lcd.drawText(5, y, "Parsing Field 4: ", TEXT_COLOR)
-    drawProgress(y, done_var_4, valPos)
+    drawProgress(140, y, done_var_4, valPos)
 
 end
 
@@ -817,7 +782,7 @@ local function state_PARSE_DATA_refresh(event, touchState)
     if conversionSensorId == 0 then
         conversionSensorId = 1
         conversionSensorProgress = 0
-        local fileTime = getTotalSeconds(current_session.endTime) - getTotalSeconds(current_session.startTime)
+        local fileTime = m_lib_file_parser.getTotalSeconds(current_session.endTime) - m_lib_file_parser.getTotalSeconds(current_session.startTime)
         graphTimeBase = valPos / fileTime
 
         for varIndex = 1, 4, 1 do
@@ -832,7 +797,7 @@ local function state_PARSE_DATA_refresh(event, touchState)
                     unit = string.sub(columnName, i + 1, #columnName - 1)
                     columnName = string.sub(columnName, 0, i - 1)
                 end
-                m_log.info("state_PARSE_DATA_refresh: col-name: %d. %s", varIndex, columnName)
+                --m_log.info("state_PARSE_DATA_refresh: col-name: %d. %s", varIndex, columnName)
                 _points[varIndex] = {
                     min = 9999,
                     max = -9999,
@@ -891,27 +856,19 @@ local function drawMain()
     lcd.clear()
 
     -- draw background
-    if state == STATE.SHOW_GRAPH then
-        --    lcd.drawFilledRectangle(0, 0, LCD_W, LCD_H, BLACK)
-        --lcd.drawText(LCD_W - 85, LCD_H - 18, "Offer Shmuely", SMLSIZE + GREEN)
-        lcd.drawBitmap(img_bg2, 0, 0)
+    if state == STATE.SPLASH then
+        lcd.drawBitmap(img_bg1, 0, 0)
+    elseif state == STATE.SHOW_GRAPH then
+        lcd.drawBitmap(img_bg3, 0, 0)
     else
-        -- lcd.drawFilledRectangle(0, 0, LCD_W, LCD_H, WHITE)
-
         -- draw top-bar
         lcd.drawFilledRectangle(0, 0, LCD_W, 20, TITLE_BGCOLOR)
-        --lcd.drawText(LCD_W - 95, LCD_H - 18, "Offer Shmuely", SMLSIZE)
-        lcd.drawBitmap(img_bg1, 0, 0)
+        lcd.drawBitmap(img_bg2, 0, 0)
     end
-
-    --draw top-bar
-    --lcd.drawFilledRectangle(0, 0, LCD_W, 20, TITLE_BGCOLOR)
-    --lcd.setColor(CUSTOM_COLOR, lcd.RGB(193, 198, 215))
 
     if filename ~= nil then
         lcd.drawText(30, 1, "/LOGS/" .. filename, WHITE + SMLSIZE)
     end
-
 end
 
 local function run_GRAPH_Adjust(amount, mode)
@@ -1030,7 +987,6 @@ local function drawGraph_base()
 
     --lcd.drawFilledRectangle(390, 1, 100, 18, DARKGREEN)
     lcd.drawText(380, 3, "Mode: " .. txt, SMLSIZE + BLACK)
-    --lcd.drawText(LCD_W - 85, LCD_H - 18, "Offer Shmuely", SMLSIZE + GREEN)
 end
 
 local function drawGraph_var_is_visible(varIndex)
@@ -1386,17 +1342,15 @@ function M.run(event, touchState)
     --m_log.info("run() ---------------------------")
     --m_log.info("event: %s", event)
 
-    --if event == EVT_TOUCH_SLIDE then
-    --    m_log.info("EVT_TOUCH_SLIDE")
-    --    m_log.info("EVT_TOUCH_SLIDE, startX:%d   x:%d", touchState.startX, touchState.x)
-    --    m_log.info("EVT_TOUCH_SLIDE, startY:%d   y:%d", touchState.startY, touchState.y)
-    --    local d = math.floor((touchState.startY - touchState.y) / 20 + 0.5)
-    --end
 
     drawMain()
 
 
-    if state == STATE.INIT then
+    if state == STATE.SPLASH then
+        m_log.info("STATE.SPLASH")
+        return state_SPLASH()
+
+    elseif state == STATE.INIT then
         m_log.info("STATE.INIT")
         return state_INIT()
 

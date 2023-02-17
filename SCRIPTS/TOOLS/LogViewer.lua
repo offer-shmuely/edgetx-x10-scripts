@@ -1,4 +1,4 @@
--- TNS|__LogViewer 1.8|TNE
+-- TNS|LogViewer 1.9|TNE
 
 ---- #########################################################################
 ---- #                                                                       #
@@ -18,25 +18,23 @@
 -- This script display a log file as a graph
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
--- Date: 2022
-local ver = "1.8"
+-- Date: 2023
+local ver = "1.9"
 
 -- to get help:
 -- change in lib_log.lua to "ENABLE_LOG_FILE=true"
 -- change in lib_log.lua to "ENABLE_LOG_TO_FILE= false"
--- run the script again,
--- and send me the log file that will be created
--- /SCRIPTS/TOOLS/LogViewer/app.log
+-- run the script ...
+-- send me the log file that will be created on: /SCRIPTS/TOOLS/LogViewer/app.log
 
 
-my_loading_flag = "tcd"
+local my_loading_flag = "tcd"
 
 local my_module = nil
 local error_desc = nil
 local script_folder = "/SCRIPTS/TOOLS/LogViewer/"
 
 local function validate_image(file_name)
-
     -- validate bg1
     local img1 = Bitmap.open(script_folder .. file_name)
     local w, h = Bitmap.getSize(img1)
@@ -49,7 +47,6 @@ local function validate_image(file_name)
 end
 
 local function validate_script(file_name, expected_ver)
-
     -- validate libgui exist
     local code_chunk = loadScript(script_folder .. file_name, my_loading_flag)
     if code_chunk == nil then
@@ -57,6 +54,9 @@ local function validate_script(file_name, expected_ver)
         return
     end
 
+    if expected_ver == nil then
+        return -- file exist, no specific version needed
+    end
     -- validate libgui version
     local m = code_chunk()
     local the_ver = m.getVer()
@@ -70,8 +70,24 @@ local function validate_script(file_name, expected_ver)
     collectgarbage("collect")
 end
 
-
 local function validate_files()
+    validate_script("LogViewer3", ver)
+    if error_desc ~= nil then return end
+
+    validate_script("lib_log")
+    if error_desc ~= nil then return end
+
+    validate_script("lib_file_index")
+    if error_desc ~= nil then return end
+
+    validate_script("lib_file_parser")
+    if error_desc ~= nil then return end
+
+    validate_script("lib_utils")
+    if error_desc ~= nil then return end
+
+    validate_script("lib_tables")
+    if error_desc ~= nil then return end
 
     validate_image("bg1.png")
     if error_desc ~= nil then return end
@@ -79,37 +95,16 @@ local function validate_files()
     validate_image("bg2.png")
     if error_desc ~= nil then return end
 
-    validate_script("LogViewer3", ver)
-    if error_desc ~= nil then return end
-
-    --validate_script("index_file", ver)
-    --if error_desc ~= nil then return end
-    --
-    --validate_script("lib_file_parser", ver)
-    --if error_desc ~= nil then return end
-    --
-    --validate_script("utils", ver)
-    --if error_desc ~= nil then return end
-    --
-    --validate_script("lib_log", ver)
-    --if error_desc ~= nil then return end
-    --
-    --validate_script("utils_table", ver)
-    --if error_desc ~= nil then return end
-
     validate_script("libgui", "1.0.2")
     if error_desc ~= nil then return end
 
-
 end
 
-
 local function init()
-
     validate_files()
     if error_desc ~= nil then return end
 
-    my_module = loadScript("/SCRIPTS/TOOLS/LogViewer/LogViewer3", my_loading_flag)()
+    my_module = loadScript("/SCRIPTS/TOOLS/LogViewer/LogViewer3", my_loading_flag)(my_loading_flag)
     return my_module.init()
 end
 

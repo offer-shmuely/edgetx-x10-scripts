@@ -1,4 +1,8 @@
-local M =  {}
+local m_log, app_name = ...
+
+local M = {}
+M.m_log = m_log
+M.app_name = app_name
 
 --local m_log = require("./LogViewer/lib_log")
 
@@ -28,29 +32,29 @@ function M.table_clear(tbl)
 end
 
 function M.table_print(prefix, tbl)
-    m_log.info("-------------")
-    m_log.info("table_print(%s)", prefix)
+    M.m_log.info("-------------")
+    M.m_log.info("table_print(%s)", prefix)
     for i = 1, #tbl, 1 do
         local val = tbl[i]
         if type(val) ~= "table" then
-            m_log.info(string.format("%d. %s: %s", i, prefix, val))
+            M.m_log.info(string.format("%d. %s: %s", i, prefix, val))
         else
             local t_val = val
-            m_log.info("-++++------------ %d %s", #val, type(t_val))
+            M.m_log.info("-++++------------ %d %s", #val, type(t_val))
             for j = 1, #t_val, 1 do
                 local val = t_val[j]
-                 m_log.info(string.format("%d. %s: %s", i, prefix, val))
+                 M.m_log.info(string.format("%d. %s: %s", i, prefix, val))
             end
         end
     end
-    m_log.info("------------- table_print end")
+    M.m_log.info("------------- table_print end")
 end
 
 function M.compare_file_names(a, b)
-    a1 = string.sub(a.file_name, -21, -5)
-    b1 = string.sub(b.file_name, -21, -5)
-    --m_log.info("ab, %s ? %s", a, b)
-    --m_log.info("a1b1, %s ? %s", a1, b1)
+    local a1 = string.sub(a.file_name, -21, -5)
+    local b1 = string.sub(b.file_name, -21, -5)
+    --M.m_log.info("ab, %s ? %s", a, b)
+    --M.m_log.info("a1b1, %s ? %s", a1, b1)
     return a1 > b1
 end
 
@@ -59,7 +63,7 @@ function M.list_ordered_insert(lst, newVal, cmp, firstValAt)
     -- sort
     for i = firstValAt, #lst, 1 do
         -- remove duplication
-        --m_log.info("list_ordered_insert - %s ? %s",  newVal, lst[i] )
+        --M.m_log.info("list_ordered_insert - %s ? %s",  newVal, lst[i] )
         if newVal == lst[i] then
             --print_table("list_ordered_insert - duplicated", lst)
             return

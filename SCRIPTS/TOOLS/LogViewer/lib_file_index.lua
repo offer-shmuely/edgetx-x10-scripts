@@ -1,4 +1,11 @@
+local m_log, app_name, m_utils, m_tables, m_lib_file_parser = ...
+
 local M = {}
+M.m_log = m_log
+M.app_name = app_name
+M.m_tables = m_tables
+M.m_utils = m_utils
+M.m_lib_file_parser = m_lib_file_parser
 
 --local m_tables = require("./LogViewer/utils_table")
 --local m_log = require("./LogViewer/lib_log")
@@ -10,11 +17,11 @@ M.idx_file_name = "/LOGS/log-viewer.csv"
 M.log_files_index_info = {}
 
 function M.indexInit()
-    m_tables.table_clear(M.log_files_index_info)
+    M.m_tables.table_clear(M.log_files_index_info)
 end
 
 local function updateFile(file_name, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str)
-    m_log.info("updateFile(%s)", file_name)
+    M.m_log.info("updateFile(%s)", file_name)
 
     local new_file = {
         file_name = m_utils.trim(file_name),
@@ -26,13 +33,13 @@ local function updateFile(file_name, start_time, end_time, total_seconds, total_
         col_with_data_str = m_utils.trim(col_with_data_str),
         all_col_str = m_utils.trim(all_col_str)
     }
-    m_tables.list_ordered_insert(M.log_files_index_info, new_file, m_tables.compare_file_names, 1)
-    --m_log.info("22222222222: %d - %s", #M.log_files_index_info, file_name)
+    M.m_tables.list_ordered_insert(M.log_files_index_info, new_file, M.m_tables.compare_file_names, 1)
+    --M.m_log.info("22222222222: %d - %s", #M.log_files_index_info, file_name)
 end
 
 function M.show(prefix)
     local tbl = M.log_files_index_info
-    m_log.info("-------------show start (%s)", prefix)
+    M.m_log.info("-------------show start (%s)", prefix)
     for i = 1, #tbl, 1 do
         local f_info = tbl[i]
         local s = string.format("%d. file_name:%s, start_time: %s, end_time: %s, total_seconds: %s, total_lines: %s, start_index: %s, col_with_data_str: [%s], all_col_str: [%s]", i,
@@ -46,14 +53,14 @@ function M.show(prefix)
             f_info.all_col_str
         )
 
-        m_log.info(s)
+        M.m_log.info(s)
     end
-    m_log.info("------------- show end")
+    M.m_log.info("------------- show end")
 end
 
 function M.indexRead()
-    m_log.info("indexRead()")
-    m_tables.table_clear(M.log_files_index_info)
+    M.m_log.info("indexRead()")
+    M.m_tables.table_clear(M.log_files_index_info)
     local hFile = io.open(M.idx_file_name, "r")
     if hFile == nil then
         return
@@ -63,30 +70,39 @@ function M.indexRead()
     local data1 = io.read(hFile, 2048)
     local index = string.find(data1, "\n")
     if index == nil then
-        m_log.info("Index header could not be found, file: %s", M.idx_file_name)
+        M.m_log.info("Index header could not be found, file: %s", M.idx_file_name)
         return
     end
 
     -- check that index file is correct version
     local api_ver = string.match(data1, "# api_ver=(%d*)")
-    m_log.info("api_ver: %s", api_ver)
+    M.m_log.info("api_ver: %s", api_ver)
     if api_ver ~= "3" then
-        m_log.info("api_ver of index files is not updated (api_ver=%d)", api_ver)
+        M.m_log.info("api_ver of index files is not updated (api_ver=%d)", api_ver)
         return
     end
 
+    -- list actual files on disk
+    local files_on_disk = {}
+    for fn in dir("/LOGS") do
+        --m_log.info("files_on_disk fn: %s", fn)
+        files_on_disk[fn] = "OK"
+    end
+    m_tables.table_print("files_on_disk", files_on_disk)
+
     -- get header line
     local headerLine = string.sub(data1, 1, index)
-    m_log.info("indexRead: header: %s", headerLine)
+    M.m_log.info("indexRead: header: %s", headerLine)
 
     io.seek(hFile, index)
     local data2 = io.read(hFile, 2048 * 32)
 
     --M.show("indexRead-should-be-empty")
+    local is_index_have_deleted_files = false
     for line in string.gmatch(data2, "([^\n]+)\n") do
 
         if string.sub(line, 1, 1) ~= "#" then
-            m_log.info("indexRead: index-line: %s", line)
+            M.m_log.info("indexRead: index-line: %s", line)
             local values = m_utils.split(line)
 
             local file_name = m_utils.trim(values[1])
@@ -97,31 +113,43 @@ function M.indexRead()
             local start_index = m_utils.trim(values[6])
             local col_with_data_str = m_utils.trim_safe(values[7])
             local all_col_str = m_utils.trim_safe(values[8])
-            --m_log.info(string.format("indexRead: got: file_name: %s, start_time: %s, end_time: %s, total_seconds: %s, total_lines: %s, start_index: %s, col_with_data_str: %s, all_col_str: %s", file_name, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str))
-            updateFile(file_name, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str)
+            --M.m_log.info(string.format("indexRead: got: file_name: %s, start_time: %s, end_time: %s, total_seconds: %s, total_lines: %s, start_index: %s, col_with_data_str: %s, all_col_str: %s", file_name, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str))
+
+            -- if file from index file, still exist on disk?
+            if files_on_disk[file_name] == "OK" then
+                --m_log.info("files_on_disk exist: %s", file_name)
+                updateFile(file_name, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str)
+            else
+                m_log.info("files_on_disk not exist: %s", file_name)
+                is_index_have_deleted_files = true
+            end
         end
     end
 
     io.close(hFile)
-    --M.show("indexRead-should-with-data")
+    if is_index_have_deleted_files == true then
+        M.indexSave()
+    end
+
+    M.show("end of indexRead")
 end
 
 function M.getFileDataInfo(file_name)
-    m_log.info("getFileDataInfo(%s)", file_name)
+    M.m_log.info("getFileDataInfo(%s)", file_name)
     --M.show("M.getFileDataInfo-start")
 
     for i = 1, #M.log_files_index_info do
         local f_info = M.log_files_index_info[i]
-        --m_log.info("getFileDataInfo: %s ?= %s", file_name, f_info.file_name)
+        --M.m_log.info("getFileDataInfo: %s ?= %s", file_name, f_info.file_name)
         if file_name == f_info.file_name then
-            m_log.info("getFileDataInfo: info from cache %s", file_name)
+            M.m_log.info("getFileDataInfo: info from cache %s", file_name)
             return false, f_info.start_time, f_info.end_time, f_info.total_seconds, f_info.total_lines, f_info.start_index, f_info.col_with_data_str, f_info.all_col_str
         end
     end
 
-    m_log.info("getFileDataInfo: file not in index, indexing... %s", file_name)
+    M.m_log.info("getFileDataInfo: file not in index, indexing... %s", file_name)
 
-    local start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str = m_lib_file_parser.getFileDataInfo(file_name)
+    local start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str = M.m_lib_file_parser.getFileDataInfo(file_name)
 
     if start_time == nil then
         return false, nil, nil, nil, nil, nil, nil, nil
@@ -140,7 +168,7 @@ function M.getFileDataInfo(file_name)
 end
 
 function M.indexSave()
-    m_log.info("indexSave()")
+    M.m_log.info("indexSave()")
     --local is_exist = is_file_exists(M.idx_file_name)
     local hFile = io.open(M.idx_file_name, "w")
 
@@ -152,7 +180,7 @@ function M.indexSave()
     io.write(hFile, ver_line)
 
     --M.show("M.log_files_index_info")
-    m_log.info("#M.log_files_index_info: %d", #M.log_files_index_info)
+    M.m_log.info("#M.log_files_index_info: %d", #M.log_files_index_info)
     for i = 1, #M.log_files_index_info, 1 do
         local info = M.log_files_index_info[i]
 
@@ -174,10 +202,10 @@ end
 
 
 --function M.getFileColumns(file_name)
---    m_log.info("getFileColumns(%s)", file_name)
+--    M.m_log.info("getFileColumns(%s)", file_name)
 --    local start_time, total_seconds, total_lines, col_with_data_str = M.getFileDataInfo(file_name)
---    m_log.info("getFileColumns4(%s)", file_name)
---    m_log.info("getFileColumns(%s) --> %s", file_name, col_with_data_str)
+--    M.m_log.info("getFileColumns4(%s)", file_name)
+--    M.m_log.info("getFileColumns(%s) --> %s", file_name, col_with_data_str)
 --    return col_with_data_str
 --end
 
