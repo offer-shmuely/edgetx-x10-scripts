@@ -1,4 +1,4 @@
--- TNS|LogViewer 1.9|TNE
+-- TNS|LogViewer 1.10|TNE
 
 ---- #########################################################################
 ---- #                                                                       #
@@ -19,7 +19,7 @@
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2023
-local ver = "1.9"
+local ver = "1.10"
 
 -- to get help:
 -- change in lib_log.lua to "ENABLE_LOG_FILE=true"
@@ -27,15 +27,21 @@ local ver = "1.9"
 -- run the script ...
 -- send me the log file that will be created on: /SCRIPTS/TOOLS/LogViewer/app.log
 
+local app_name = "LogViewer"
 
-local my_loading_flag = "tcd"
+local m_log = nil
+local m_utils = nil
+local m_tables = nil
+local m_lib_file_parser = nil
+local m_index_file = nil
+local m_libgui = nil
+local m_log_viewer3 = nil
 
-local my_module = nil
+
 local error_desc = nil
 local script_folder = "/SCRIPTS/TOOLS/LogViewer/"
 
 local function validate_image(file_name)
-    -- validate bg1
     local img1 = Bitmap.open(script_folder .. file_name)
     local w, h = Bitmap.getSize(img1)
     if w == 0 and h == 0  then
@@ -46,66 +52,68 @@ local function validate_image(file_name)
     collectgarbage("collect")
 end
 
-local function validate_script(file_name, expected_ver)
-    -- validate libgui exist
+local function validate_script(file_name, expected_ver, ...)
+    -- validate module exist
+    local my_loading_flag = "tcd"
     local code_chunk = loadScript(script_folder .. file_name, my_loading_flag)
     if code_chunk == nil then
         error_desc = "File not found: " .. script_folder .. file_name
         return
     end
 
+    print(string.format("%s - loading, num args: %d", file_name, #{...}))
+    local m = code_chunk(...)
+    print(string.format("%s - loaded OK", file_name))
     if expected_ver == nil then
-        return -- file exist, no specific version needed
+        return m -- file exist, no specific version needed
     end
-    -- validate libgui version
-    local m = code_chunk()
+
     local the_ver = m.getVer()
     print("the_ver: " .. the_ver)
     if the_ver ~= expected_ver then
         error_desc = "incorrect version of file:\n " .. script_folder .. file_name .. ".lua \n (" .. the_ver .. " <> " .. expected_ver .. ")"
-        return
+        return nil
     end
-    m = nil
-
-    collectgarbage("collect")
+    return m
+    --collectgarbage("collect")
 end
 
 local function validate_files()
-    validate_script("LogViewer3", ver)
+    m_log = validate_script("lib_log", nil, app_name, "/SCRIPTS/TOOLS/" .. app_name)
+    if error_desc ~= nil then return end
+    m_log.info("loaded")
+
+    m_utils = validate_script("lib_utils", nil, m_log, app_name)
     if error_desc ~= nil then return end
 
-    validate_script("lib_log")
+    m_tables = validate_script("lib_tables", nil, m_log, app_name)
     if error_desc ~= nil then return end
 
-    validate_script("lib_file_index")
+    m_lib_file_parser = validate_script("lib_file_parser", nil, m_log, app_name, m_utils)
     if error_desc ~= nil then return end
 
-    validate_script("lib_file_parser")
+    m_index_file = validate_script("lib_file_index", nil, m_log, app_name, m_utils, m_tables, m_lib_file_parser)
     if error_desc ~= nil then return end
 
-    validate_script("lib_utils")
+    m_libgui = validate_script("libgui", "1.0.2")
     if error_desc ~= nil then return end
 
-    validate_script("lib_tables")
+    m_log_viewer3 = validate_script("LogViewer3", ver, m_log, m_utils,m_tables,m_lib_file_parser,m_index_file,m_libgui)
     if error_desc ~= nil then return end
+
 
     validate_image("bg1.png")
     if error_desc ~= nil then return end
 
     validate_image("bg2.png")
     if error_desc ~= nil then return end
-
-    validate_script("libgui", "1.0.2")
-    if error_desc ~= nil then return end
-
 end
 
 local function init()
     validate_files()
     if error_desc ~= nil then return end
 
-    my_module = loadScript("/SCRIPTS/TOOLS/LogViewer/LogViewer3", my_loading_flag)(my_loading_flag)
-    return my_module.init()
+    return m_log_viewer3.init()
 end
 
 local function run(event, touchState)
@@ -118,7 +126,7 @@ local function run(event, touchState)
         return 0
     end
 
-    return my_module.run(event, touchState)
+    return m_log_viewer3.run(event, touchState)
 end
 
 return { init = init, run = run }

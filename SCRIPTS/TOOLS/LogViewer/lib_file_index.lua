@@ -34,10 +34,9 @@ local function updateFile(file_name, start_time, end_time, total_seconds, total_
         all_col_str = m_utils.trim(all_col_str)
     }
     M.m_tables.list_ordered_insert(M.log_files_index_info, new_file, M.m_tables.compare_file_names, 1)
-    --M.m_log.info("22222222222: %d - %s", #M.log_files_index_info, file_name)
 end
 
-function M.show(prefix)
+function M.indexPrint(prefix)
     local tbl = M.log_files_index_info
     M.m_log.info("-------------show start (%s)", prefix)
     for i = 1, #tbl, 1 do
@@ -97,7 +96,7 @@ function M.indexRead()
     io.seek(hFile, index)
     local data2 = io.read(hFile, 2048 * 32)
 
-    --M.show("indexRead-should-be-empty")
+    --M.indexPrint("indexRead-should-be-empty")
     local is_index_have_deleted_files = false
     for line in string.gmatch(data2, "([^\n]+)\n") do
 
@@ -131,18 +130,18 @@ function M.indexRead()
         M.indexSave()
     end
 
-    M.show("end of indexRead")
+    M.indexPrint("end of indexRead")
 end
 
 function M.getFileDataInfo(file_name)
-    M.m_log.info("getFileDataInfo(%s)", file_name)
-    --M.show("M.getFileDataInfo-start")
+    --M.m_log.info("getFileDataInfo(%s)", file_name)
+    --M.indexPrint("M.getFileDataInfo-start")
 
     for i = 1, #M.log_files_index_info do
         local f_info = M.log_files_index_info[i]
         --M.m_log.info("getFileDataInfo: %s ?= %s", file_name, f_info.file_name)
         if file_name == f_info.file_name then
-            M.m_log.info("getFileDataInfo: info from cache %s", file_name)
+            --M.m_log.info("getFileDataInfo: info from cache %s", file_name)
             return false, f_info.start_time, f_info.end_time, f_info.total_seconds, f_info.total_lines, f_info.start_index, f_info.col_with_data_str, f_info.all_col_str
         end
     end
@@ -179,7 +178,7 @@ function M.indexSave()
     local ver_line = "# api_ver=3\n"
     io.write(hFile, ver_line)
 
-    --M.show("M.log_files_index_info")
+    --M.indexPrint("M.log_files_index_info")
     M.m_log.info("#M.log_files_index_info: %d", #M.log_files_index_info)
     for i = 1, #M.log_files_index_info, 1 do
         local info = M.log_files_index_info[i]

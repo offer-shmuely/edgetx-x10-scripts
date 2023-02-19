@@ -1,4 +1,4 @@
-local my_loading_flag = ...
+local m_log,m_utils,m_tables,m_lib_file_parser,m_index_file,m_libgui  = ...
 
 local M = {}
 
@@ -21,13 +21,11 @@ local M = {}
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2023
-local ver = "1.9"
+local ver = "1.10"
 
 function M.getVer()
     return ver
 end
-
-local app_name = "LogViewer"
 
 --m_log = require("LogViewer/lib_log")
 --m_lib_file_parser = require("LogViewer/lib_file_parser")
@@ -35,13 +33,6 @@ local app_name = "LogViewer"
 --m_tables = require("LogViewer/lib_tables")
 --local m_index_file = require("LogViewer/lib_file_index")
 --local m_libgui = require("LogViewer/libgui")
-
-local m_log = loadScript("/SCRIPTS/TOOLS/LogViewer/lib_log", my_loading_flag)(app_name, "/SCRIPTS/TOOLS/" .. app_name)
-local m_utils = loadScript("/SCRIPTS/TOOLS/LogViewer/lib_utils", my_loading_flag)(m_log, app_name)
-local m_tables = loadScript("/SCRIPTS/TOOLS/LogViewer/lib_tables", my_loading_flag)(m_log, app_name)
-local m_lib_file_parser = loadScript("/SCRIPTS/TOOLS/LogViewer/lib_file_parser", my_loading_flag)(m_log, app_name, m_utils)
-local m_index_file = loadScript("/SCRIPTS/TOOLS/LogViewer/lib_file_index", my_loading_flag)(m_log, app_name, m_utils, m_tables, m_lib_file_parser)
-local m_libgui = loadScript("/SCRIPTS/TOOLS/LogViewer/libgui", my_loading_flag)(m_log, app_name)
 
 --function cache
 local math_floor = math.floor
@@ -62,6 +53,7 @@ local log_file_list_raw = {}
 local log_file_list_raw_idx = -1
 
 local log_file_list_filtered = {}
+local log_file_list_filtered2 = {}
 local filter_model_name
 local filter_model_name_idx = 1
 local filter_date
@@ -275,7 +267,7 @@ local function read_and_index_file_list()
         log_file_list_raw_idx = 0
         for fn in dir("/LOGS") do
             --m_tables.table_print("log_file_list_raw", log_file_list_raw)
-            m_log.info("fn: %s", fn)
+            --m_log.info("fn: %s", fn)
             log_file_list_raw[log_file_list_raw_idx + 1] = fn
             log_file_list_raw_idx = log_file_list_raw_idx + 1
         end
@@ -339,14 +331,11 @@ local function onLogFileChange(obj)
     --m_tables.table_print("log_file_list_filtered", log_file_list_filtered)
 
     local i = obj.selected
-    -- Todo: maybe the i is grater then num of fields when paging backward
-    --labelDropDown.title = "Selected switch: " .. dropDownItems[i] .. " [" .. dropDownIndices[i] .. "]"
-    m_log.info("Selected switch: " .. i)
-    m_log.info("Selected switch: " .. log_file_list_filtered[i])
     filename = log_file_list_filtered[i]
-    filename = log_file_list_filtered[i]
+    m_log.info("Selected file index: %d", i)
+    m_log.info("Selected file: %s", log_file_list_filtered[i])
     filename_idx = i
-    m_log.info("filename: " .. filename)
+    --m_log.info("filename: " .. filename)
 end
 
 local function onAccuracyChange(obj)
@@ -370,7 +359,7 @@ local function onAccuracyChange(obj)
 end
 
 local function filter_log_file_list(filter_model_name, filter_date, need_update)
-    m_log.info("need to filter by: [%s] [%s]", filter_model_name, filter_date)
+    m_log.info("need to filter by: [%s] [%s] [%s]", filter_model_name, filter_date, need_update)
 
     m_tables.table_clear(log_file_list_filtered)
 
@@ -415,10 +404,21 @@ local function filter_log_file_list(filter_model_name, filter_date, need_update)
 
     end
 
+    m_tables.table_clear(log_file_list_filtered2)
+
     if #log_file_list_filtered == 0 then
         table.insert(log_file_list_filtered, "not found")
+        table.insert(log_file_list_filtered2, "not found")
+    else
+        -- prepare list with friendly names
+        for i=1, #log_file_list_filtered do
+            -- get duration
+            local is_new, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str = m_index_file.getFileDataInfo(log_file_list_filtered[i])
+            log_file_list_filtered2[#log_file_list_filtered2 +1] = string.format("%s (%.0fmin)", log_file_list_filtered[i], total_seconds/60)
+        end
+        --m_tables.table_print("prepare friendly names", log_file_list_filtered2)
     end
-    m_tables.table_print("filter_log_file_list", log_file_list_filtered)
+    --m_tables.table_print("filter_log_file_list", log_file_list_filtered)
 
     -- update the log combo to first
     if need_update == true then
@@ -496,7 +496,7 @@ local function state_SELECT_FILE_init(event, touchState)
 
         m_log.info("setting file combo...")
         ctx1.label(10, 105, 60, 24, "Log file")
-        ddLogFile = ctx1.dropDown(90, 105, 380, 24, log_file_list_filtered, filename_idx,
+        ddLogFile = ctx1.dropDown(90, 105, 380, 24, log_file_list_filtered2, filename_idx,
             onLogFileChange
         )
         onLogFileChange(ddLogFile)
@@ -659,8 +659,10 @@ local function state_SELECT_FILE_refresh(event, touchState)
         columns_with_data[1] = "---"
         for i = 1, #columns_temp, 1 do
             local col = columns_temp[i]
-            columns_with_data[#columns_with_data + 1] = col
-            m_log.info("state_SELECT_FILE_refresh: col: %s", col)
+            if m_utils.trim_safe(col) ~= "" then
+                columns_with_data[#columns_with_data + 1] = col
+                m_log.info("state_SELECT_FILE_refresh: col: [%s]", col)
+            end
         end
 
         --m_log.info("state_SELECT_FILE_refresh: #columns_with_data: %d", #columns_with_data)
@@ -820,7 +822,7 @@ local function state_PARSE_DATA_refresh(event, touchState)
             _values[conversionSensorId][i] = val
             conversionSensorProgress = conversionSensorProgress + 1
             cnt = cnt + 1
-            m_log.info("PARSE_DATA: %d. %s %s", conversionSensorId, val, _values[conversionSensorId][i])
+            --m_log.info("PARSE_DATA: %d. %s %s", conversionSensorId, val, _values[conversionSensorId][i])
             --m_log.info("PARSE_DATA: %d. %s %d %d min:%d max:%d", conversionSensorId, _points[conversionSensorId].name, val, #_points[conversionSensorId].points, _points[conversionSensorId].min, _points[conversionSensorId].max)
 
             if val > _points[conversionSensorId].max then
@@ -839,7 +841,7 @@ local function state_PARSE_DATA_refresh(event, touchState)
 
     if conversionSensorId == 4 then
         graphStart = 0
-        graphSize = valPos
+        graphSize = valPos * 0.75 -- default zoom
         cursor = 50
         graphMinMaxEditorIndex = 0
         graphMode = GRAPH_MODE.CURSOR
@@ -894,6 +896,8 @@ local function run_GRAPH_Adjust(amount, mode)
 
         local oldGraphSize = graphSize
         graphSize = math.floor(graphSize / (1 + (amount * 0.02)))
+
+        m_log.info("graphSize: %d", graphSize)
 
         -- max zoom control
         if graphSize < 31 then
@@ -1265,17 +1269,6 @@ local function state_SHOW_GRAPH_refresh(event, touchState)
             graphMinMaxEditorIndex = 7
         end
     elseif event == EVT_VIRTUAL_ENTER or event == EVT_ROT_BREAK then
-        -- mode state machine
-        --if graphMode == GRAPH_MODE.CURSOR then
-        --    graphMode = GRAPH_MODE.ZOOM
-        --elseif graphMode == GRAPH_MODE.ZOOM then
-        --    graphMode = GRAPH_MODE.SCROLL
-        --elseif graphMode == GRAPH_MODE.SCROLL then
-        --    graphMode = GRAPH_MODE.MINMAX
-        --else
-        --    graphMode = GRAPH_MODE.CURSOR
-        --end
-
         -- mode state machine
         if graphMode == GRAPH_MODE.CURSOR then
             graphMode = GRAPH_MODE.MINMAX
