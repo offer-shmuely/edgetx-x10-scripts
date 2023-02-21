@@ -21,7 +21,7 @@ local M = {}
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2023
-local ver = "1.10"
+local ver = "1.11"
 
 function M.getVer()
     return ver
@@ -121,6 +121,7 @@ local graphConfig = {
     x_end = LCD_W,
     y_start = 40,
     y_end = 240,
+    DEFAULT_CENTER_Y = 120,
     { color = GREEN, valx = 20, valy = 249, minx = 5, miny = 220, maxx = 5, maxy = 30 },
     { color = RED, valx = 130, valy = 249, minx = 5, miny = 205, maxx = 5, maxy = 45 },
     { color = WHITE, valx = 250, valy = 249, minx = 5, miny = 190, maxx = 5, maxy = 60 },
@@ -539,6 +540,10 @@ local function colWithData2ColByHeader(colWithDataId)
 end
 
 local function select_sensors_preset_first_4()
+    if sensorSelection[1].idx ~= 1 or sensorSelection[2].idx ~= 1 or sensorSelection[3].idx ~= 1 or sensorSelection[4].idx ~= 1 then
+        return -- keep the last selection
+    end
+
     for i = 1, 4, 1 do
         if i < #columns_with_data then
             sensorSelection[i].idx = i + 1
@@ -998,14 +1003,15 @@ local function drawGraph_var_is_visible(varIndex)
     return (sensorSelection[varIndex].idx >= FIRST_VALID_COL) and (_points[varIndex].min ~= 0 or _points[varIndex].max ~= 0)
 end
 
-local function drawGraph_graph_lines_single_line(points, min, max)
-    if min == max then
-        return
-    end
+local function drawGraph_graph_lines_single_line(varIndex, points, min, max)
+    --if min == max then
+    --    return
+    --end
 
     local yScale = (max - min) / 200
     local prevY = graphConfig.y_end - ((points[0] - min) / yScale)
     prevY = math.min(math.max(prevY, graphConfig.y_start), graphConfig.y_end)
+
     --if prevY > graphConfig.y_end then
     --    prevY = graphConfig.y_end
     --elseif prevY < graphConfig.y_start then
@@ -1015,6 +1021,10 @@ local function drawGraph_graph_lines_single_line(points, min, max)
     for i = 0, #points - 1, 1 do
         local x1 = graphConfig.x_start + (xStep * i)
         local y = graphConfig.y_end - ((points[i + 1] - min) / yScale)
+        if min == max then
+            y = graphConfig.DEFAULT_CENTER_Y + 5 * varIndex
+            prevY = y
+        end
 
         y = math.min(math.max(y, graphConfig.y_start), graphConfig.y_end)
         --if y > graphConfig.y_end then
@@ -1048,7 +1058,7 @@ local function drawGraph_graph_lines()
 
             -- points
             lcd.setColor(CUSTOM_COLOR, varCfg.color)
-            drawGraph_graph_lines_single_line(varPoints.points, varPoints.min, varPoints.max)
+            drawGraph_graph_lines_single_line(varIndex, varPoints.points, varPoints.min, varPoints.max)
 
         end
     end
@@ -1158,6 +1168,10 @@ local function drawGraph_cursor()
         -- cursor values
         local yScale = (varPoints.max - varPoints.min) / 200
         local cursor_y = graphConfig.y_end - ((varPoints.points[cursor] - varPoints.min) / yScale)
+        if varPoints.min == varPoints.max then
+            cursor_y = graphConfig.DEFAULT_CENTER_Y + 5 * varIndex
+        end
+
         local x1 = cursor_x + 30
         local y1 = 120 + 25 * varIndex
         local v_txt = varPoints.points[cursor] .. varPoints.unit

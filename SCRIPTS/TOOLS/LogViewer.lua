@@ -1,4 +1,4 @@
--- TNS|LogViewer 1.10|TNE
+-- TNS|LogViewer 1.11|TNE
 
 ---- #########################################################################
 ---- #                                                                       #
@@ -19,7 +19,7 @@
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2023
-local ver = "1.10"
+local ver = "1.11"
 
 -- to get help:
 -- change in lib_log.lua to "ENABLE_LOG_FILE=true"
