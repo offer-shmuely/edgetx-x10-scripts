@@ -155,6 +155,11 @@ local select_file_gui_init = false
 
 ---- #########################################################################
 
+--------------------------------------------------------------
+local function log(fmt, ...)
+    m_log.info(fmt, ...)
+end
+--------------------------------------------------------------
 
 local function doubleDigits(value)
     if value < 10 then
@@ -182,7 +187,7 @@ local function collectData()
 
         valPos = 0
         lines = 0
-        m_log.info(string.format("current_session.total_lines: %d", current_session.total_lines))
+        log(string.format("current_session.total_lines: %d", current_session.total_lines))
 
         _points = {}
         _values = {}
@@ -208,12 +213,12 @@ local function collectData()
     for line in string_gmatch(buffer, "([^\n]+)\n") do
         if math.fmod(lines, skipLines) == 0 then
             local vals = m_utils.split(line)
-            --m_log.info(string.format("collectData: 1: %s, 2: %s, 3: %s, 4: %s, line: %s", vals[1], vals[2], vals[3], vals[4], line))
+            --log(string.format("collectData: 1: %s, 2: %s, 3: %s, 4: %s, line: %s", vals[1], vals[2], vals[3], vals[4], line))
 
             for varIndex = 1, 4, 1 do
                 if sensorSelection[varIndex].idx >= FIRST_VALID_COL then
                     local colId = sensorSelection[varIndex].colId
-                    --m_log.info(string.format("collectData: varIndex: %d, sensorSelectionId: %d, colId: %d, val: %d", varIndex, sensorSelection[varIndex].colId, colId, vals[colId]))
+                    --log(string.format("collectData: varIndex: %d, sensorSelectionId: %d, colId: %d, val: %d", varIndex, sensorSelection[varIndex].colId, colId, vals[colId]))
                     _values[varIndex][valPos] = vals[colId]
                 end
             end
@@ -249,7 +254,7 @@ local function compare_names(a, b)
 end
 
 local function drawProgress(x, y, current, total)
-    --m_log.info(string.format("drawProgress(%d. %d, %d)", y, current, total))
+    --log(string.format("drawProgress(%d. %d, %d)", y, current, total))
     --local x = 140
     local pct = current / total
     lcd.drawFilledRectangle(x + 1, y + 1, (470 - x - 2) * pct, 14, TEXT_INVERTED_BGCOLOR)
@@ -259,16 +264,16 @@ end
 -- read log file list
 local function read_and_index_file_list()
 
-    --m_log.info("read_and_index_file_list(%d, %d)", log_file_list_raw_idx, #log_file_list_raw)
+    --log("read_and_index_file_list(%d, %d)", log_file_list_raw_idx, #log_file_list_raw)
 
     if (#log_file_list_raw == 0) then
-        m_log.info("read_and_index_file_list: init")
+        log("read_and_index_file_list: init")
         m_index_file.indexInit()
         --log_file_list_raw = dir("/LOGS")
         log_file_list_raw_idx = 0
         for fn in dir("/LOGS") do
             --m_tables.table_print("log_file_list_raw", log_file_list_raw)
-            --m_log.info("fn: %s", fn)
+            --log("fn: %s", fn)
             log_file_list_raw[log_file_list_raw_idx + 1] = fn
             log_file_list_raw_idx = log_file_list_raw_idx + 1
         end
@@ -295,20 +300,20 @@ local function read_and_index_file_list()
 
             drawProgress(160, 60, log_file_list_raw_idx, #log_file_list_raw)
 
-            m_log.info("log file: (%d/%d) %s (detecting...)", log_file_list_raw_idx, #log_file_list_raw, filename)
+            log("log file: (%d/%d) %s (detecting...)", log_file_list_raw_idx, #log_file_list_raw, filename)
 
             local modelName, year, month, day, hour, min, sec, m, d, y = string.match(filename, "^(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv$")
             if modelName == nil then
                 goto continue
             end
-            --m_log.info("log file: %s (is csv)", fileName)
+            --log("log file: %s (is csv)", fileName)
             local model_day = string.format("%s-%s-%s", year, month, day)
 
             -- read file
             local is_new, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str = m_index_file.getFileDataInfo(filename)
 
-            --m_log.info("read_and_index_file_list: total_lines: %s, total_seconds: %s, col_with_data_str: [%s], all_col_str: [%s]", total_lines, total_seconds, col_with_data_str, all_col_str)
-            m_log.info("read_and_index_file_list: total_seconds: %s", total_seconds)
+            --log("read_and_index_file_list: total_lines: %s, total_seconds: %s, col_with_data_str: [%s], all_col_str: [%s]", total_lines, total_seconds, col_with_data_str, all_col_str)
+            log("read_and_index_file_list: total_seconds: %s", total_seconds)
             m_tables.list_ordered_insert(model_name_list, modelName, compare_names, 2)
             m_tables.list_ordered_insert(date_list, model_day, compare_dates, 2)
 
@@ -333,16 +338,16 @@ local function onLogFileChange(obj)
 
     local i = obj.selected
     filename = log_file_list_filtered[i]
-    m_log.info("Selected file index: %d", i)
-    m_log.info("Selected file: %s", log_file_list_filtered[i])
+    log("Selected file index: %d", i)
+    log("Selected file: %s", log_file_list_filtered[i])
     filename_idx = i
-    --m_log.info("filename: " .. filename)
+    --log("filename: " .. filename)
 end
 
 local function onAccuracyChange(obj)
     local i = obj.selected
     local accuracy = i
-    m_log.info("Selected accuracy: %s (%d)", accuracy_list[i], i)
+    log("Selected accuracy: %s (%d)", accuracy_list[i], i)
 
     if accuracy == 4 then
         skipLines = 10
@@ -360,14 +365,14 @@ local function onAccuracyChange(obj)
 end
 
 local function filter_log_file_list(filter_model_name, filter_date, need_update)
-    m_log.info("need to filter by: [%s] [%s] [%s]", filter_model_name, filter_date, need_update)
+    log("need to filter by: [%s] [%s] [%s]", filter_model_name, filter_date, need_update)
 
     m_tables.table_clear(log_file_list_filtered)
 
     for i = 1, #m_index_file.log_files_index_info do
         local log_file_info = m_index_file.log_files_index_info[i]
 
-        --m_log.info("filter_log_file_list: %d. %s", i, log_file_info.file_name)
+        --log("filter_log_file_list: %d. %s", i, log_file_info.file_name)
 
         local modelName, year, month, day, hour, min, sec, m, d, y = string.match(log_file_info.file_name, "^(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv$")
 
@@ -397,10 +402,10 @@ local function filter_log_file_list(filter_model_name, filter_date, need_update)
         end
 
         if is_model_name_ok and is_date_ok and is_duration_ok and is_have_data_ok then
-            m_log.info("filter_log_file_list: [%s] - OK (%s,%s)", log_file_info.file_name, filter_model_name, filter_date)
+            log("filter_log_file_list: [%s] - OK (%s,%s)", log_file_info.file_name, filter_model_name, filter_date)
             table.insert(log_file_list_filtered, log_file_info.file_name)
         else
-            m_log.info("filter_log_file_list: [%s] - FILTERED-OUT (filters:%s,%s) (model_name_ok:%s,date_ok:%s,duration_ok:%s,have_data_ok:%s)", log_file_info.file_name, filter_model_name, filter_date, is_model_name_ok, is_date_ok, is_duration_ok, is_have_data_ok)
+            log("filter_log_file_list: [%s] - FILTERED-OUT (filters:%s,%s) (model_name_ok:%s,date_ok:%s,duration_ok:%s,have_data_ok:%s)", log_file_info.file_name, filter_model_name, filter_date, is_model_name_ok, is_date_ok, is_duration_ok, is_have_data_ok)
         end
 
     end
@@ -435,7 +440,7 @@ local function state_SPLASH(event, touchState)
         splash_start_time = getTime()
     end
     local elapsed = getTime() - splash_start_time;
-    m_log.info('elapsed: %d (t.durationMili: %d)', elapsed, splash_start_time)
+    log('elapsed: %d (t.durationMili: %d)', elapsed, splash_start_time)
     local elapsedMili = elapsed * 10;
     -- was 1500, but most the time will go anyway from the load of the scripts
     if (elapsedMili >= 500) then
@@ -462,40 +467,40 @@ local function state_SELECT_FILE_init(event, touchState)
     m_tables.table_clear(log_file_list_filtered)
     filter_log_file_list(nil, nil, false)
 
-    m_log.info("++++++++++++++++++++++++++++++++")
+    log("++++++++++++++++++++++++++++++++")
     if select_file_gui_init == false then
         select_file_gui_init = true
         -- creating new window gui
-        m_log.info("creating new window gui")
+        log("creating new window gui")
         --ctx1 = libGUI.newGUI()
 
         ctx1.label(10, 25, 120, 24, "log file...", BOLD)
 
-        m_log.info("setting model filter...")
+        log("setting model filter...")
         ctx1.label(10, 55, 60, 24, "Model")
         ddModel = ctx1.dropDown(90, 55, 380, 24, model_name_list, 1,
             function(obj)
                 local i = obj.selected
                 filter_model_name = model_name_list[i]
                 filter_model_name_idx = i
-                m_log.info("Selected model-name: " .. filter_model_name)
+                log("Selected model-name: " .. filter_model_name)
                 filter_log_file_list(filter_model_name, filter_date, true)
             end
         )
 
-        m_log.info("setting date filter...")
+        log("setting date filter...")
         ctx1.label(10, 80, 60, 24, "Date")
         ctx1.dropDown(90, 80, 380, 24, date_list, 1,
             function(obj)
                 local i = obj.selected
                 filter_date = date_list[i]
                 filter_date_idx = i
-                m_log.info("Selected filter_date: " .. filter_date)
+                log("Selected filter_date: " .. filter_date)
                 filter_log_file_list(filter_model_name, filter_date, true)
             end
         )
 
-        m_log.info("setting file combo...")
+        log("setting file combo...")
         ctx1.label(10, 105, 60, 24, "Log file")
         ddLogFile = ctx1.dropDown(90, 105, 380, 24, log_file_list_filtered2, filename_idx,
             onLogFileChange
@@ -525,13 +530,13 @@ local function colWithData2ColByHeader(colWithDataId)
     local sensorName = columns_with_data[colWithDataId]
     local colByHeaderId = 0
 
-    m_log.info("colWithData2ColByHeader: byData     - idx: %d, name: %s", colWithDataId, sensorName)
+    log("colWithData2ColByHeader: byData     - idx: %d, name: %s", colWithDataId, sensorName)
 
-    m_log.info("#columns_by_header: %d", #columns_by_header)
+    log("#columns_by_header: %d", #columns_by_header)
     for i = 1, #columns_by_header do
         if columns_by_header[i] == sensorName then
             colByHeaderId = i
-            m_log.info("colWithData2ColByHeader: byHeader - colId: %d, name: %s", colByHeaderId, columns_by_header[colByHeaderId])
+            log("colWithData2ColByHeader: byHeader - colId: %d, name: %s", colByHeaderId, columns_by_header[colByHeaderId])
             return colByHeaderId
         end
     end
@@ -547,18 +552,18 @@ local function select_sensors_preset_first_4()
     for i = 1, 4, 1 do
         if i < #columns_with_data then
             sensorSelection[i].idx = i + 1
-            m_log.info("%d. sensors is: %s", i, columns_with_data[i])
+            log("%d. sensors is: %s", i, columns_with_data[i])
             sensorSelection[i].values[i - 1] = columns_with_data[i]
         else
             sensorSelection[i].idx = 1
             sensorSelection[i].values[0] = "---"
         end
-        m_log.info("state_SELECT_SENSORS_INIT %d. <= %d (%d)", i , sensorSelection[i].idx, #columns_with_data)
+        log("state_SELECT_SENSORS_INIT %d. <= %d (%d)", i , sensorSelection[i].idx, #columns_with_data)
     end
 end
 
 local function state_SELECT_SENSORS_INIT(event, touchState)
-    m_log.info("state_SELECT_SENSORS_INIT")
+    log("state_SELECT_SENSORS_INIT")
     m_tables.table_print("sensors-init columns_with_data", columns_with_data)
 
     -- select default sensor
@@ -569,19 +574,19 @@ local function state_SELECT_SENSORS_INIT(event, touchState)
     current_option = 1
 
     -- creating new window gui
-    m_log.info("creating new window gui")
+    log("creating new window gui")
     ctx2 = nil
     ctx2 = m_libgui.newGUI()
 
     ctx2.label(10, 25, 120, 24, "Select sensors...", BOLD)
 
-    m_log.info("setting field1...")
+    log("setting field1...")
     ctx2.label(10, 55, 60, 24, "Field 1")
     ctx2.dropDown(90, 55, 380, 24, columns_with_data, sensorSelection[1].idx,
         function(obj)
             local i = obj.selected
             local var1 = columns_with_data[i]
-            m_log.info("Selected var1: " .. var1)
+            log("Selected var1: " .. var1)
             sensorSelection[1].idx = i
             sensorSelection[1].colId = colWithData2ColByHeader(i)
         end
@@ -592,7 +597,7 @@ local function state_SELECT_SENSORS_INIT(event, touchState)
         function(obj)
             local i = obj.selected
             local var2 = columns_with_data[i]
-            m_log.info("Selected var2: " .. var2)
+            log("Selected var2: " .. var2)
             sensorSelection[2].idx = i
             sensorSelection[2].colId = colWithData2ColByHeader(i)
         end
@@ -603,7 +608,7 @@ local function state_SELECT_SENSORS_INIT(event, touchState)
         function(obj)
             local i = obj.selected
             local var3 = columns_with_data[i]
-            m_log.info("Selected var3: " .. var3)
+            log("Selected var3: " .. var3)
             sensorSelection[3].idx = i
             sensorSelection[3].colId = colWithData2ColByHeader(i)
         end
@@ -614,7 +619,7 @@ local function state_SELECT_SENSORS_INIT(event, touchState)
         function(obj)
             local i = obj.selected
             local var4 = columns_with_data[i]
-            m_log.info("Selected var4: " .. var4)
+            log("Selected var4: " .. var4)
             sensorSelection[4].idx = i
             sensorSelection[4].colId = colWithData2ColByHeader(i)
         end
@@ -632,14 +637,14 @@ end
 local function state_SELECT_FILE_refresh(event, touchState)
     -- ## file selected
     if event == EVT_VIRTUAL_NEXT_PAGE then
-        m_log.info("state_SELECT_FILE_refresh --> EVT_VIRTUAL_NEXT_PAGE: filename: %s", filename)
+        log("state_SELECT_FILE_refresh --> EVT_VIRTUAL_NEXT_PAGE: filename: %s", filename)
         if filename == "not found" then
             m_log.warn("state_SELECT_FILE_refresh: trying to next-page, but no logfile available, ignoring.")
             return 0
         end
 
         --Reset file load data
-        m_log.info("Reset file load data")
+        log("Reset file load data")
         buffer = ""
         lines = 0
         heap = 2048 * 12
@@ -659,31 +664,31 @@ local function state_SELECT_FILE_refresh(event, touchState)
 
         -- update columns
         local columns_temp, cnt = m_utils.split_pipe(col_with_data_str)
-        m_log.info("state_SELECT_FILE_refresh: #col: %d", cnt)
+        log("state_SELECT_FILE_refresh: #col: %d", cnt)
         m_tables.table_clear(columns_with_data)
         columns_with_data[1] = "---"
         for i = 1, #columns_temp, 1 do
             local col = columns_temp[i]
             if m_utils.trim_safe(col) ~= "" then
                 columns_with_data[#columns_with_data + 1] = col
-                m_log.info("state_SELECT_FILE_refresh: col: [%s]", col)
+                log("state_SELECT_FILE_refresh: col: [%s]", col)
             end
         end
 
-        --m_log.info("state_SELECT_FILE_refresh: #columns_with_data: %d", #columns_with_data)
+        --log("state_SELECT_FILE_refresh: #columns_with_data: %d", #columns_with_data)
         --for i = #columns_temp, 4, 1 do
         --    columns_with_data[#columns_with_data + 1] = "---"
-        --    m_log.info("state_SELECT_FILE_refresh: add empty field: %d", i)
+        --    log("state_SELECT_FILE_refresh: add empty field: %d", i)
         --end
         --m_tables.table_print("state_SELECT_FILE_refresh columns_with_data", columns_with_data)
 
         local columns_temp, cnt = m_utils.split_pipe(all_col_str)
-        m_log.info("state_SELECT_FILE_refresh: #col: %d", cnt)
+        log("state_SELECT_FILE_refresh: #col: %d", cnt)
         m_tables.table_clear(columns_by_header)
         for i = 1, #columns_temp, 1 do
             local col = columns_temp[i]
             columns_by_header[#columns_by_header + 1] = col
-            -- m_log.info("state_SELECT_FILE_refresh: col: %s", col)
+            -- log("state_SELECT_FILE_refresh: col: %s", col)
         end
 
         state = STATE.SELECT_SENSORS_INIT
@@ -711,7 +716,7 @@ local function state_SELECT_SENSORS_refresh(event, touchState)
 end
 
 local function display_read_data_progress(conversionSensorId, conversionSensorProgress)
-    --m_log.info("display_read_data_progress(%d, %d)", conversionSensorId, conversionSensorProgress)
+    --log("display_read_data_progress(%d, %d)", conversionSensorId, conversionSensorProgress)
     lcd.drawText(5, 25, "Reading data from file...", TEXT_COLOR)
 
     lcd.drawText(5, 60, "Reading line: " .. lines, TEXT_COLOR)
@@ -800,11 +805,11 @@ local function state_PARSE_DATA_refresh(event, touchState)
                 local unit = ""
 
                 if i ~= nil then
-                    --m_log.info("read-header: %d, %s", i, unit)
+                    --log("read-header: %d, %s", i, unit)
                     unit = string.sub(columnName, i + 1, #columnName - 1)
                     columnName = string.sub(columnName, 0, i - 1)
                 end
-                --m_log.info("state_PARSE_DATA_refresh: col-name: %d. %s", varIndex, columnName)
+                --log("state_PARSE_DATA_refresh: col-name: %d. %s", varIndex, columnName)
                 _points[varIndex] = {
                     min = 9999,
                     max = -9999,
@@ -820,15 +825,15 @@ local function state_PARSE_DATA_refresh(event, touchState)
     end
 
     --
-    --m_log.info("PARSE_DATA: %d. %s >= %s", conversionSensorId, sensorSelection[conversionSensorId].idx, FIRST_VALID_COL)
+    --log("PARSE_DATA: %d. %s >= %s", conversionSensorId, sensorSelection[conversionSensorId].idx, FIRST_VALID_COL)
     if sensorSelection[conversionSensorId].idx >= FIRST_VALID_COL then
         for i = conversionSensorProgress, valPos - 1, 1 do
             local val = tonumber(_values[conversionSensorId][i])
             _values[conversionSensorId][i] = val
             conversionSensorProgress = conversionSensorProgress + 1
             cnt = cnt + 1
-            --m_log.info("PARSE_DATA: %d. %s %s", conversionSensorId, val, _values[conversionSensorId][i])
-            --m_log.info("PARSE_DATA: %d. %s %d %d min:%d max:%d", conversionSensorId, _points[conversionSensorId].name, val, #_points[conversionSensorId].points, _points[conversionSensorId].min, _points[conversionSensorId].max)
+            --log("PARSE_DATA: %d. %s %s", conversionSensorId, val, _values[conversionSensorId][i])
+            --log("PARSE_DATA: %d. %s %d %d min:%d max:%d", conversionSensorId, _points[conversionSensorId].name, val, #_points[conversionSensorId].points, _points[conversionSensorId].min, _points[conversionSensorId].max)
 
             if val > _points[conversionSensorId].max then
                 _points[conversionSensorId].max = val
@@ -902,7 +907,7 @@ local function run_GRAPH_Adjust(amount, mode)
         local oldGraphSize = graphSize
         graphSize = math.floor(graphSize / (1 + (amount * 0.02)))
 
-        m_log.info("graphSize: %d", graphSize)
+        log("graphSize: %d", graphSize)
 
         -- max zoom control
         if graphSize < 31 then
@@ -999,7 +1004,7 @@ local function drawGraph_base()
 end
 
 local function drawGraph_var_is_visible(varIndex)
-    --m_log.info("drawGraph_var_is_visible: varIndex: %d, ,min: %d, max: %d", varIndex, _points[varIndex].min, _points[varIndex].max)
+    --log("drawGraph_var_is_visible: varIndex: %d, ,min: %d, max: %d", varIndex, _points[varIndex].min, _points[varIndex].max)
     return (sensorSelection[varIndex].idx >= FIRST_VALID_COL) and (_points[varIndex].min ~= 0 or _points[varIndex].max ~= 0)
 end
 
@@ -1045,8 +1050,8 @@ local function drawGraph_graph_lines()
         if drawGraph_var_is_visible(varIndex) then
             local varPoints = _points[varIndex]
             local varCfg = graphConfig[varIndex]
-            --m_log.info(string.format("drawGraph: %d.%s %d min:%d max:%d", varIndex, varPoints.name, #varPoints.points, varPoints.min, varPoints.max))
-            --m_log.info("drawGraph: %d. %s", varIndex, varPoints.columnName)
+            --log(string.format("drawGraph: %d.%s %d min:%d max:%d", varIndex, varPoints.name, #varPoints.points, varPoints.min, varPoints.max))
+            --log("drawGraph: %d. %s", varIndex, varPoints.columnName)
             if #varPoints.points == 0 then
                 for i = 0, 100, 1 do
                     varPoints.points[i] = _values[varIndex][math_floor(graphStart + (i * skip))]
@@ -1297,12 +1302,12 @@ local function state_SHOW_GRAPH_refresh(event, touchState)
     end
 
     if event == EVT_TOUCH_SLIDE then
-        m_log.info("EVT_TOUCH_SLIDE")
-        m_log.info("EVT_TOUCH_SLIDE, startX:%d   x:%d", touchState.startX, touchState.x)
-        m_log.info("EVT_TOUCH_SLIDE, startY:%d   y:%d", touchState.startY, touchState.y)
+        log("EVT_TOUCH_SLIDE")
+        log("EVT_TOUCH_SLIDE, startX:%d   x:%d", touchState.startX, touchState.x)
+        log("EVT_TOUCH_SLIDE, startY:%d   y:%d", touchState.startY, touchState.y)
         local dx = touchState.startX - touchState.x
         local adjust = math.floor(dx / 100)
-        m_log.info("EVT_TOUCH_SLIDE, dx:%d,   adjust:%d", dx, adjust)
+        log("EVT_TOUCH_SLIDE, dx:%d,   adjust:%d", dx, adjust)
         run_GRAPH_Adjust(adjust, GRAPH_MODE.SCROLL)
     end
 
@@ -1346,43 +1351,43 @@ function M.run(event, touchState)
         return 2
     end
 
-    --m_log.info("run() ---------------------------")
-    --m_log.info("event: %s", event)
+    --log("run() ---------------------------")
+    --log("event: %s", event)
 
 
     drawMain()
 
 
     if state == STATE.SPLASH then
-        m_log.info("STATE.SPLASH")
+        log("STATE.SPLASH")
         return state_SPLASH()
 
     elseif state == STATE.INIT then
-        m_log.info("STATE.INIT")
+        log("STATE.INIT")
         return state_INIT()
 
     elseif state == STATE.SELECT_FILE_INIT then
-        m_log.info("STATE.SELECT_FILE_INIT")
+        log("STATE.SELECT_FILE_INIT")
         return state_SELECT_FILE_init(event, touchState)
 
     elseif state == STATE.SELECT_FILE then
-        --m_log.info("STATE.state_SELECT_FILE_refresh")
+        --log("STATE.state_SELECT_FILE_refresh")
         return state_SELECT_FILE_refresh(event, touchState)
 
     elseif state == STATE.SELECT_SENSORS_INIT then
-        m_log.info("STATE.SELECT_SENSORS_INIT")
+        log("STATE.SELECT_SENSORS_INIT")
         return state_SELECT_SENSORS_INIT(event, touchState)
 
     elseif state == STATE.SELECT_SENSORS then
-        --m_log.info("STATE.SELECT_SENSORS")
+        --log("STATE.SELECT_SENSORS")
         return state_SELECT_SENSORS_refresh(event, touchState)
 
     elseif state == STATE.READ_FILE_DATA then
-        m_log.info("STATE.READ_FILE_DATA")
+        log("STATE.READ_FILE_DATA")
         return state_READ_FILE_DATA_refresh(event, touchState)
 
     elseif state == STATE.PARSE_DATA then
-        m_log.info("STATE.PARSE_DATA")
+        log("STATE.PARSE_DATA")
         return state_PARSE_DATA_refresh(event, touchState)
 
     elseif state == STATE.SHOW_GRAPH then
