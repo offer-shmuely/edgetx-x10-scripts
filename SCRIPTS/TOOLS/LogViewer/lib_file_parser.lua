@@ -26,6 +26,9 @@ function M.getTotalSeconds(time)
 end
 
 function M.getFileDataInfo(fileName)
+    M.m_log.info("getFileDataInfo(%s)", fileName)
+
+    --local t1_model =getTime()
 
     local hFile = io.open("/LOGS/" .. fileName, "r")
     if hFile == nil then
@@ -54,7 +57,7 @@ function M.getFileDataInfo(fileName)
 
     -- get header line
     local headerLine = string.sub(data1, 1, index)
-    M.m_log.info("header-line: [%s]", headerLine)
+    --M.m_log.info("header-line: [%s]", headerLine)
 
     -- get columns
     columns_by_header = M.m_utils.split(headerLine)
@@ -64,8 +67,11 @@ function M.getFileDataInfo(fileName)
 
     -- stop after 2M (1000x2028)
     local sample_col_data = nil
-    for i = 1, 1000 do
+    for i = 1, 50000 do
+        --M.m_log.info("profiler: start")
+        --local t1 =getTime()
         local data2 = io.read(hFile, 2048)
+        --M.m_utils.timeProfilerAdd('read()', t1);
 
         -- file read done
         if data2 == "" then
@@ -85,37 +91,42 @@ function M.getFileDataInfo(fileName)
 
             for idxCol = 1, #columns_by_header do
                 local col_name = columns_by_header[idxCol]
-                col_name = string.gsub(col_name, "\n", "")
+                col_name = string_gsub(col_name, "\n", "")
                 col_name = M.m_utils.trim_safe(col_name)
                 if columns_is_have_data[idxCol] == true and col_name ~= "Date" and col_name ~= "Time" then
                     columns_with_data[#columns_with_data + 1] = col_name
-                    if string.len(col_with_data_str) == 0 then
+                    if string_len(col_with_data_str) == 0 then
                         col_with_data_str = col_name
                     else
                         col_with_data_str = col_with_data_str .. "|" .. col_name
                     end
                 end
 
-                if string.len(all_col_str) == 0 then
+                if string_len(all_col_str) == 0 then
                     all_col_str = col_name
                 else
                     all_col_str = all_col_str .. "|" .. col_name
                 end
-
             end
 
-            M.m_log.info("parser:getFileDataInfo: done - col_with_data_str: %s", col_with_data_str)
+            --M.m_log.info("parser:getFileDataInfo: done - col_with_data_str: %s", col_with_data_str)
             --for idxCol = 1, #columns_with_data do
             --    M.m_log.info("getFileDataInfo@ %d: %s", idxCol, columns_with_data[idxCol])
             --end
 
+            --M.m_utils.timeProfilerAdd(fileName, t1_model); -- total model parsing time
+            --M.m_utils.timeProfilerShow(true)
             return start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str
         end
 
         buffer = buffer .. data2
         local idx_buff = 0
 
-        for line in string_gmatch(buffer, "([^\n]+)\n") do
+        --M.m_utils.timeProfilerAdd('pre-line1');
+        local line_list = string_gmatch(buffer, "([^\n]+)\n")
+        --M.m_utils.timeProfilerAdd('pre-line2');
+        for line in line_list do
+            --local t2 =getTime()
             total_lines = total_lines + 1
             --M.m_log.info("getFileDataInfo: %d. line: %s", total_lines, line)
             --M.m_log.info("getFileDataInfo2: line: %d", total_lines)
@@ -125,9 +136,11 @@ function M.getFileDataInfo(fileName)
                 start_time = time
             end
             end_time = time
+            --M.m_utils.timeProfilerAdd('in-line1', t2);
+            local vals = M.m_utils.split(line) -- hot
+            --M.m_utils.timeProfilerAdd('in-line2b');
 
             -- find columns with data
-            local vals = M.m_utils.split(line)
             if sample_col_data == nil then
                 sample_col_data = vals
                 for idxCol = 1, #columns_by_header, 1 do
@@ -135,46 +148,39 @@ function M.getFileDataInfo(fileName)
                 end
             end
 
-            for idxCol = 1, #columns_by_header, 1 do
-                --if ("Thr" == columns_by_header[idxCol]) then
-                --    M.m_log.info("find-col-with-d: %d. %s, %s, %s", total_lines, columns_by_header[idxCol], vals[idxCol], sample_col_data[idxCol])
-                --end
+            --M.m_utils.timeProfilerAdd('in-line3');
+            for idxCol = 1, #columns_by_header, 1 do -- hot (whole loop)
+                local curr_col = columns_by_header[idxCol]
 
                 local have_data = vals[idxCol] ~= sample_col_data[idxCol]
-
-                -- always show
-                if columns_by_header[idxCol] == "RQly(%)"  then have_data = true end
-                if columns_by_header[idxCol] == "TQly(%)"  then have_data = true end
-                if columns_by_header[idxCol] == "TPWR(mW)" then have_data = true end
-                if columns_by_header[idxCol] == "RSNR(dB)" then have_data = true end
-                if columns_by_header[idxCol] == "VFR(%)"   then have_data = true end
-
-                -- always ignore
-                if columns_by_header[idxCol] == "GPS"     then have_data = false end
-                if columns_by_header[idxCol] == "LSW"     then have_data = false end
+                if have_data == true then
+                    -- always ignore
+                    if curr_col == "GPS"     then have_data = false end
+                    if curr_col == "LSW"     then have_data = false end
+                else
+                    -- always show
+                    if curr_col == "RQly(%)"  then have_data = true end
+                    if curr_col == "TQly(%)"  then have_data = true end
+                    if curr_col == "TPWR(mW)" then have_data = true end
+                    if curr_col == "RSNR(dB)" then have_data = true end
+                    if curr_col == "VFR(%)"   then have_data = true end
+                end
 
                 if have_data then
                     columns_is_have_data[idxCol] = true
-                    --if ("Thr" == columns_by_header[idxCol]) then
-                    --    M.m_log.info("find-col-with-d: %s =true", columns_by_header[idxCol])
-                    --end
                     --M.m_log.info("find-col-with-d: %s=true", columns_by_header[idxCol])
                 --else
                 --    M.m_log.info("find-col-with-d: %s =false (%s <> %s)", columns_by_header[idxCol], vals[idxCol] , sample_col_data[idxCol])
                 end
-
             end
-
-            --local buf1 = ""
-            --for idxCol = 1, #columns_by_header do
-            --    buf1 = buf1 .. string.format("%s: %s\n", columns_by_header[idxCol], columns_with_data[idxCol])
-            --end
-            --M.m_log.info("getFileDataInfo %s", buf1)
+            --M.m_utils.timeProfilerAdd('in-line4');
 
             idx_buff = idx_buff + string.len(line) + 1 -- dont forget the newline
+            --M.m_utils.timeProfilerAdd('im-line5');
         end
 
         buffer = string.sub(buffer, idx_buff + 1) -- dont forget the newline
+        --M.m_utils.timeProfilerAdd('after-line1', t1);
     end
 
     io.close(hFile)

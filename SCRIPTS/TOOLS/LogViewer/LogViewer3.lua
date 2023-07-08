@@ -21,7 +21,7 @@ local M = {}
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2023
-local ver = "1.11"
+local ver = "1.12"
 
 function M.getVer()
     return ver
@@ -63,6 +63,10 @@ local date_list = { "-- all --" }
 local accuracy_list = { "1/1 (read every line)", "1/2 (every 2nd line)", "1/5 (every 5th line)", "1/10 (every 10th line)" }
 local ddModel = nil
 local ddLogFile = nil -- log-file dropDown object
+local ddIndexType = nil
+
+local INDEX_TYPE = {ALL=1, TODAY=2, LAST=3}
+local index_type = INDEX_TYPE.ALL
 
 local filename
 local filename_idx = 1
@@ -75,17 +79,20 @@ local FIRST_VALID_COL = 2
 -- state machine
 local STATE = {
     SPLASH = 0,
-    INIT = 1,
-    SELECT_FILE_INIT = 2,
-    SELECT_FILE = 3,
+    SELECT_INDEX_TYPE_INIT = 1,
+    SELECT_INDEX_TYPE = 2,
+    INDEX_FILES_INIT = 3,
+    INDEX_FILES = 4,
+    SELECT_FILE_INIT = 5,
+    SELECT_FILE = 6,
 
-    SELECT_SENSORS_INIT = 4,
-    SELECT_SENSORS = 5,
+    SELECT_SENSORS_INIT = 7,
+    SELECT_SENSORS = 8,
 
-    READ_FILE_DATA = 6,
-    PARSE_DATA = 7,
+    READ_FILE_DATA = 9,
+    PARSE_DATA = 10,
 
-    SHOW_GRAPH = 8
+    SHOW_GRAPH = 11
 }
 
 local state = STATE.SPLASH
@@ -151,6 +158,7 @@ local img_bg3 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg3.png")
 -- Instantiate a new GUI object
 local ctx1 = m_libgui.newGUI()
 local ctx2 = m_libgui.newGUI()
+local ctx3 = m_libgui.newGUI()
 local select_file_gui_init = false
 
 ---- #########################################################################
@@ -261,25 +269,100 @@ local function drawProgress(x, y, current, total)
     lcd.drawRectangle(x, y, 470 - x, 16, TEXT_COLOR)
 end
 
+local function get_log_files_list()
+
+    -- find latest log and latest day
+    local last_day = "1970-01-01"
+    local last_log_day_time = "1970-01-01-00-00-00"
+    for fn in dir("/LOGS") do
+        local modelName, year, month, day, hour, min, sec, m, d, y = string.match(fn, "^(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv$")
+        if year~=nil and month~=nil and day~=nil then
+            local log_day = string.format("%s-%s-%s", year, month, day)
+            local log_day_time = string.format("%s-%s-%s-%s-%s-%s", year, month, day, hour, min, sec)
+            --log("log_day: %s", log_day)
+            if log_day > last_day then
+                last_day = log_day
+                --log("last_day: %s", last_day)
+            end
+            if log_day_time > last_log_day_time then
+                last_log_day_time = log_day_time
+                --log("last_log: %s", last_log)
+            end
+        end
+    end
+    log("latest day: %s", last_day)
+    log("last_log: %s", last_log_day_time)
+
+
+
+
+    local log_files_list_all = {}
+    local log_files_list_today = {}
+    local log_files_list_latest = {}
+    for fn in dir("/LOGS") do
+        --log("fn: %s", fn)
+
+        local modelName, year, month, day, hour, min, sec, m, d, y = string.match(fn, "^(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv$")
+        local log_day = string.format("%s-%s-%s", year, month, day)
+        local log_day_time = string.format("%s-%s-%s-%s-%s-%s", year, month, day, hour, min, sec)
+
+        log_files_list_all[#log_files_list_all+1] = fn
+
+        if log_day==last_day then
+            log_files_list_today[#log_files_list_today+1] = fn
+        end
+
+        if log_day_time==last_log_day_time then
+            log_files_list_latest[#log_files_list_latest+1] = fn
+        end
+    end
+    --m_tables.table_print("log_files_list_all", log_files_list_all)
+    m_tables.table_print("log_files_list_today", log_files_list_today)
+    m_tables.table_print("log_files_list_latest", log_files_list_latest)
+
+    if index_type == INDEX_TYPE.ALL then
+        log("using files for index of type ALL")
+        return log_files_list_all
+    elseif index_type == INDEX_TYPE.TODAY then
+        log("using files for index of type TODAY")
+        return log_files_list_today
+    elseif index_type == INDEX_TYPE.LAST then
+        log("using files for index of type LAST")
+        return log_files_list_latest
+    end
+
+    log("internal error, unknown index_type: %s", index_type)
+    return nil
+end
+
 -- read log file list
 local function read_and_index_file_list()
-
     --log("read_and_index_file_list(%d, %d)", log_file_list_raw_idx, #log_file_list_raw)
 
     if (#log_file_list_raw == 0) then
         log("read_and_index_file_list: init")
         m_index_file.indexInit()
         --log_file_list_raw = dir("/LOGS")
-        log_file_list_raw_idx = 0
-        for fn in dir("/LOGS") do
-            --m_tables.table_print("log_file_list_raw", log_file_list_raw)
-            --log("fn: %s", fn)
-            log_file_list_raw[log_file_list_raw_idx + 1] = fn
-            log_file_list_raw_idx = log_file_list_raw_idx + 1
-        end
+
+        --for fn in dir("/LOGS") do
+        --    --m_tables.table_print("log_file_list_raw", log_file_list_raw)
+        --    log("fn: %s", fn)
+        --
+        --    -- format: year (16) / month (8) / day (8) / hour (8) / min (8) / sec (8)
+        --    local now = getDateTime()
+        --    --local year = now.year
+        --
+        --    local modelName, year, month, day, hour, min, sec, m, d, y = string.match(fn, "^(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv$")
+        --    log("is_file_needed_by_index_type: %s-%s %s", year, now.year, fn)
+        --
+        --    log_file_list_raw[#log_file_list_raw + 1] = fn
+        --end
+
+        log_file_list_raw = get_log_files_list()
+
         log_file_list_raw_idx = 0
         --m_tables.table_print("log_file_list_raw", log_file_list_raw)
-        m_index_file.indexRead()
+        m_index_file.indexRead(log_file_list_raw)
     end
 
     for i = 1, 10, 1 do
@@ -402,10 +485,10 @@ local function filter_log_file_list(filter_model_name, filter_date, need_update)
         end
 
         if is_model_name_ok and is_date_ok and is_duration_ok and is_have_data_ok then
-            log("filter_log_file_list: [%s] - OK (%s,%s)", log_file_info.file_name, filter_model_name, filter_date)
+            --log("filter_log_file_list: [%s] - OK (%s,%s)", log_file_info.file_name, filter_model_name, filter_date)
             table.insert(log_file_list_filtered, log_file_info.file_name)
         else
-            log("filter_log_file_list: [%s] - FILTERED-OUT (filters:%s,%s) (model_name_ok:%s,date_ok:%s,duration_ok:%s,have_data_ok:%s)", log_file_info.file_name, filter_model_name, filter_date, is_model_name_ok, is_date_ok, is_duration_ok, is_have_data_ok)
+            --log("filter_log_file_list: [%s] - FILTERED-OUT (filters:%s,%s) (model_name_ok:%s,date_ok:%s,duration_ok:%s,have_data_ok:%s)", log_file_info.file_name, filter_model_name, filter_date, is_model_name_ok, is_date_ok, is_duration_ok, is_have_data_ok)
         end
 
     end
@@ -440,17 +523,76 @@ local function state_SPLASH(event, touchState)
         splash_start_time = getTime()
     end
     local elapsed = getTime() - splash_start_time;
-    log('elapsed: %d (t.durationMili: %d)', elapsed, splash_start_time)
+    --log('elapsed: %d (t.durationMili: %d)', elapsed, splash_start_time)
     local elapsedMili = elapsed * 10;
     -- was 1500, but most the time will go anyway from the load of the scripts
     if (elapsedMili >= 500) then
-        state = STATE.INIT
+        state = STATE.SELECT_INDEX_TYPE_INIT
     end
 
     return 0
 end
 
-local function state_INIT(event, touchState)
+local function onButtonIndexTypeAll()
+    log("onButtonIndexTypeAll")
+    index_type = INDEX_TYPE.ALL
+    state = STATE.INDEX_FILES_INIT
+end
+local function onButtonIndexTypeToday()
+    log("onButtonIndexTypeToday")
+    index_type = INDEX_TYPE.TODAY
+    state = STATE.INDEX_FILES_INIT
+end
+local function onButtonIndexTypeLastFlight()
+    log("onButtonIndexTypeLastFlight")
+    index_type = INDEX_TYPE.LAST
+    state = STATE.INDEX_FILES_INIT
+end
+
+local function state_SELECT_INDEX_TYPE_init(event, touchState)
+    log("state_SELECT_INDEX_TYPE_init()")
+    log("creating new window gui")
+
+    ctx3.label(10, 30, 70, 24, "Indexing selection:", m_libgui.FONT_SIZES.FONT_8)
+
+    ctx3.button(90, 60, 320, 55, "All flights (slow now, fast later)", onButtonIndexTypeAll)
+    ctx3.button(90, 130, 320, 55, "Today flights (last flight day", onButtonIndexTypeToday)
+    ctx3.button(90, 200, 320, 55, "Only last flight (fast now, slow later)", onButtonIndexTypeLastFlight)
+
+    -- default is ALL
+    index_type = INDEX_TYPE.ALL
+
+    log_file_list_raw = {}
+
+    state = STATE.SELECT_INDEX_TYPE
+    return 0
+end
+
+
+local function state_SELECT_INDEX_TYPE_refresh(event, touchState)
+    if event == EVT_VIRTUAL_NEXT_PAGE then
+        state = STATE.INDEX_FILES_INIT
+        return 0
+    end
+
+    lcd.drawText(30, 1, "Indexing type for new logs", WHITE + SMLSIZE)
+
+    ctx3.run(event, touchState)
+    return 0
+end
+
+local function state_INDEX_FILES_INIT(event, touchState)
+    log("state_INDEX_FILES_INIT()")
+    state = STATE.INDEX_FILES
+    return 0
+end
+
+local function state_INDEX_FILES(event, touchState)
+    if event == EVT_VIRTUAL_EXIT or event == EVT_VIRTUAL_PREV_PAGE then
+        state = STATE.SELECT_INDEX_TYPE
+        return 0
+    end
+
     -- start init
     local is_done = read_and_index_file_list()
 
@@ -467,7 +609,6 @@ local function state_SELECT_FILE_init(event, touchState)
     m_tables.table_clear(log_file_list_filtered)
     filter_log_file_list(nil, nil, false)
 
-    log("++++++++++++++++++++++++++++++++")
     if select_file_gui_init == false then
         select_file_gui_init = true
         -- creating new window gui
@@ -476,7 +617,7 @@ local function state_SELECT_FILE_init(event, touchState)
 
         ctx1.label(10, 25, 120, 24, "log file...", BOLD)
 
-        log("setting model filter...")
+        --log("setting model filter...")
         ctx1.label(10, 55, 60, 24, "Model")
         ddModel = ctx1.dropDown(90, 55, 380, 24, model_name_list, 1,
             function(obj)
@@ -488,7 +629,7 @@ local function state_SELECT_FILE_init(event, touchState)
             end
         )
 
-        log("setting date filter...")
+        --log("setting date filter...")
         ctx1.label(10, 80, 60, 24, "Date")
         ctx1.dropDown(90, 80, 380, 24, date_list, 1,
             function(obj)
@@ -523,6 +664,72 @@ local function state_SELECT_FILE_init(event, touchState)
 
 
     state = STATE.SELECT_FILE
+    return 0
+end
+
+local function state_SELECT_FILE_refresh(event, touchState)
+    -- ## file selected
+    if event == EVT_VIRTUAL_NEXT_PAGE or index_type == INDEX_TYPE.LAST then
+        log("state_SELECT_FILE_refresh --> EVT_VIRTUAL_NEXT_PAGE: filename: %s", filename)
+        if filename == "not found" then
+            m_log.warn("state_SELECT_FILE_refresh: trying to next-page, but no logfile available, ignoring.")
+            return 0
+        end
+
+        --Reset file load data
+        log("Reset file load data")
+        buffer = ""
+        lines = 0
+        heap = 2048 * 12
+        --prevTotalSeconds = 0
+
+        local is_new, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str = m_index_file.getFileDataInfo(filename)
+
+        current_session = {
+            startTime = start_time,
+            endTime = end_time,
+            total_seconds = total_seconds,
+            total_lines = total_lines,
+            startIndex = start_index,
+            col_with_data_str = col_with_data_str,
+            all_col_str = all_col_str
+        }
+
+        -- update columns
+        local columns_temp, cnt = m_utils.split_pipe(col_with_data_str)
+        log("state_SELECT_FILE_refresh: #col: %d", cnt)
+        m_tables.table_clear(columns_with_data)
+        columns_with_data[1] = "---"
+        for i = 1, #columns_temp, 1 do
+            local col = columns_temp[i]
+            if m_utils.trim_safe(col) ~= "" then
+                columns_with_data[#columns_with_data + 1] = col
+                log("state_SELECT_FILE_refresh: col: [%s]", col)
+            end
+        end
+
+        --log("state_SELECT_FILE_refresh: #columns_with_data: %d", #columns_with_data)
+        --for i = #columns_temp, 4, 1 do
+        --    columns_with_data[#columns_with_data + 1] = "---"
+        --    log("state_SELECT_FILE_refresh: add empty field: %d", i)
+        --end
+        --m_tables.table_print("state_SELECT_FILE_refresh columns_with_data", columns_with_data)
+
+        local columns_temp, cnt = m_utils.split_pipe(all_col_str)
+        log("state_SELECT_FILE_refresh: #col: %d", cnt)
+        m_tables.table_clear(columns_by_header)
+        for i = 1, #columns_temp, 1 do
+            local col = columns_temp[i]
+            columns_by_header[#columns_by_header + 1] = col
+            -- log("state_SELECT_FILE_refresh: col: %s", col)
+        end
+
+        state = STATE.SELECT_SENSORS_INIT
+        return 0
+    end
+
+    ctx1.run(event, touchState)
+
     return 0
 end
 
@@ -631,72 +838,6 @@ local function state_SELECT_SENSORS_INIT(event, touchState)
     sensorSelection[4].colId = colWithData2ColByHeader(sensorSelection[4].idx)
 
     state = STATE.SELECT_SENSORS
-    return 0
-end
-
-local function state_SELECT_FILE_refresh(event, touchState)
-    -- ## file selected
-    if event == EVT_VIRTUAL_NEXT_PAGE then
-        log("state_SELECT_FILE_refresh --> EVT_VIRTUAL_NEXT_PAGE: filename: %s", filename)
-        if filename == "not found" then
-            m_log.warn("state_SELECT_FILE_refresh: trying to next-page, but no logfile available, ignoring.")
-            return 0
-        end
-
-        --Reset file load data
-        log("Reset file load data")
-        buffer = ""
-        lines = 0
-        heap = 2048 * 12
-        --prevTotalSeconds = 0
-
-        local is_new, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str = m_index_file.getFileDataInfo(filename)
-
-        current_session = {
-            startTime = start_time,
-            endTime = end_time,
-            total_seconds = total_seconds,
-            total_lines = total_lines,
-            startIndex = start_index,
-            col_with_data_str = col_with_data_str,
-            all_col_str = all_col_str
-        }
-
-        -- update columns
-        local columns_temp, cnt = m_utils.split_pipe(col_with_data_str)
-        log("state_SELECT_FILE_refresh: #col: %d", cnt)
-        m_tables.table_clear(columns_with_data)
-        columns_with_data[1] = "---"
-        for i = 1, #columns_temp, 1 do
-            local col = columns_temp[i]
-            if m_utils.trim_safe(col) ~= "" then
-                columns_with_data[#columns_with_data + 1] = col
-                log("state_SELECT_FILE_refresh: col: [%s]", col)
-            end
-        end
-
-        --log("state_SELECT_FILE_refresh: #columns_with_data: %d", #columns_with_data)
-        --for i = #columns_temp, 4, 1 do
-        --    columns_with_data[#columns_with_data + 1] = "---"
-        --    log("state_SELECT_FILE_refresh: add empty field: %d", i)
-        --end
-        --m_tables.table_print("state_SELECT_FILE_refresh columns_with_data", columns_with_data)
-
-        local columns_temp, cnt = m_utils.split_pipe(all_col_str)
-        log("state_SELECT_FILE_refresh: #col: %d", cnt)
-        m_tables.table_clear(columns_by_header)
-        for i = 1, #columns_temp, 1 do
-            local col = columns_temp[i]
-            columns_by_header[#columns_by_header + 1] = col
-            -- log("state_SELECT_FILE_refresh: col: %s", col)
-        end
-
-        state = STATE.SELECT_SENSORS_INIT
-        return 0
-    end
-
-    ctx1.run(event, touchState)
-
     return 0
 end
 
@@ -876,6 +1017,10 @@ local function drawMain()
         -- draw top-bar
         lcd.drawFilledRectangle(0, 0, LCD_W, 20, TITLE_BGCOLOR)
         lcd.drawBitmap(img_bg2, 0, 0)
+    end
+
+    if state ~= STATE.SPLASH then
+        img_bg1 = nil
     end
 
     if filename ~= nil then
@@ -1362,9 +1507,21 @@ function M.run(event, touchState)
         log("STATE.SPLASH")
         return state_SPLASH()
 
-    elseif state == STATE.INIT then
-        log("STATE.INIT")
-        return state_INIT()
+    elseif state == STATE.SELECT_INDEX_TYPE_INIT then
+        log("STATE.SELECT_INDEX_TYPE_INIT")
+        return state_SELECT_INDEX_TYPE_init(event, touchState)
+
+    elseif state == STATE.SELECT_INDEX_TYPE then
+        --log("STATE.state_SELECT_INDEX_TYPE")
+        return state_SELECT_INDEX_TYPE_refresh(event, touchState)
+
+    elseif state == STATE.INDEX_FILES_INIT then
+        log("STATE.INDEX_FILES_INIT")
+        return state_INDEX_FILES_INIT(event, touchState)
+
+    elseif state == STATE.INDEX_FILES then
+        log("STATE.INDEX_FILES")
+        return state_INDEX_FILES(event, touchState)
 
     elseif state == STATE.SELECT_FILE_INIT then
         log("STATE.SELECT_FILE_INIT")

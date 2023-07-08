@@ -61,7 +61,7 @@ local function tostring(...)
 end
 
 function M.do_log(iLevel, ulevel, fmt, ...)
-    if log.enable_console == false then
+    if log.enable_console == false and log.enable_file == false then
         return
     end
 
@@ -86,7 +86,7 @@ function M.do_log(iLevel, ulevel, fmt, ...)
     print(msg2)
 
     -- Output to log file
-    if log.enable_file == true and log.outfile then
+    if log.enable_file == true then
         local fp = io.open(log.outfile, "a")
         io.write(fp, msg2 .. "\n")
         io.close(fp)

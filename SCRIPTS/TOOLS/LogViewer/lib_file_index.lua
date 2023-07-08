@@ -7,16 +7,12 @@ M.m_tables = m_tables
 M.m_utils = m_utils
 M.m_lib_file_parser = m_lib_file_parser
 
---local m_tables = require("./LogViewer/utils_table")
---local m_log = require("./LogViewer/lib_log")
---local m_lib_file_parser = require("LogViewer/lib_file_parser")
---local m_utils = require("LogViewer/utils")
-
 M.idx_file_name = "/LOGS/log-viewer.csv"
 
 M.log_files_index_info = {}
 
 function M.indexInit()
+    M.m_log.info("indexInit()")
     M.m_tables.table_clear(M.log_files_index_info)
 end
 
@@ -101,7 +97,7 @@ function M.indexRead()
     for line in string.gmatch(data2, "([^\n]+)\n") do
 
         if string.sub(line, 1, 1) ~= "#" then
-            M.m_log.info("indexRead: index-line: %s", line)
+            --M.m_log.info("indexRead: index-line: %s", line)
             local values = m_utils.split(line)
 
             local file_name = m_utils.trim(values[1])
