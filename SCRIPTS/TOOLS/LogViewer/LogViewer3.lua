@@ -1056,7 +1056,7 @@ local function run_GRAPH_Adjust(amount, mode)
         end
 
         local oldGraphSize = graphSize
-        graphSize = math.floor(graphSize / (1 + (amount * 0.02)))
+        graphSize = math.floor(graphSize / (1 - (amount * 0.02)))
 
         log("graphSize: %d", graphSize)
 
@@ -1068,7 +1068,7 @@ local function run_GRAPH_Adjust(amount, mode)
         end
 
         if graphSize > (valPos - graphStart) then
-            if amount > 0 then
+            if amount < 0 then
                 graphSize = valPos - graphStart
             else
                 graphStart = valPos - graphSize
@@ -1462,6 +1462,7 @@ local function state_SHOW_GRAPH_refresh(event, touchState)
         run_GRAPH_Adjust(adjust, GRAPH_MODE.SCROLL)
     end
 
+    -- move graph right or left
     local adjust = getValue('ail')
     if math.abs(adjust) > 100 then
         if math.abs(adjust) < 800 then
@@ -1474,6 +1475,7 @@ local function state_SHOW_GRAPH_refresh(event, touchState)
         end
     end
 
+    -- zoom graph
     adjust = getValue('ele') / 200
     if math.abs(adjust) > 0.5 then
         if graphMode ~= GRAPH_MODE.MINMAX then
