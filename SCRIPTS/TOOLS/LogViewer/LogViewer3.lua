@@ -21,7 +21,7 @@ local M = {}
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2023
-local ver = "1.12"
+local ver = "1.13"
 
 function M.getVer()
     return ver
@@ -555,9 +555,9 @@ local function state_SELECT_INDEX_TYPE_init(event, touchState)
 
     ctx3.label(10, 30, 70, 24, "Indexing selection:", m_libgui.FONT_SIZES.FONT_8)
 
-    ctx3.button(90, 60, 320, 55, "All flights (slow now, fast later)", onButtonIndexTypeAll)
-    ctx3.button(90, 130, 320, 55, "Today flights (last flight day", onButtonIndexTypeToday)
-    ctx3.button(90, 200, 320, 55, "Only last flight (fast now, slow later)", onButtonIndexTypeLastFlight)
+    ctx3.button(90, 60, 320, 55, "All flights (slow)", onButtonIndexTypeAll)
+    ctx3.button(90, 130, 320, 55, "Last flights day", onButtonIndexTypeToday)
+    ctx3.button(90, 200, 320, 55, "Only last flight (fast)", onButtonIndexTypeLastFlight)
 
     -- default is ALL
     index_type = INDEX_TYPE.ALL
