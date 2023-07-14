@@ -48,15 +48,6 @@ function M.table_print(prefix, tbl)
     M.m_log.info("<<< table_print end (%s) ", prefix)
 end
 
-function M.compare_file_names(a, b)
-    local a1 = string.sub(a.file_name, -21, -5)
-    local b1 = string.sub(b.file_name, -21, -5)
-    --M.m_log.info("ab, %s ? %s", a, b)
-    --M.m_log.info("a1b1, %s ? %s", a1, b1)
-    return a1 > b1
-end
-
-
 function M.list_ordered_insert(lst, newVal, cmp, firstValAt)
     -- sort
     for i = firstValAt, #lst, 1 do

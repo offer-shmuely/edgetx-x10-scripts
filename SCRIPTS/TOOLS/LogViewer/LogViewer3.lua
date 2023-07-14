@@ -253,8 +253,11 @@ end
 
 -- ---------------------------------------------------------------------------------------------------------
 
-local function compare_dates(a, b)
-    return a > b
+local function compare_dates_inc(a, b)
+    return a < b
+end
+local function compare_dates_dec(a, b)
+    return a < b
 end
 
 local function compare_names(a, b)
@@ -273,6 +276,7 @@ local function get_log_files_list()
 
     -- find latest log and latest day
     local last_day = "1970-01-01"
+    local on_disk_date_list = {}
     local last_log_day_time = "1970-01-01-00-00-00"
     for fn in dir("/LOGS") do
         local modelName, year, month, day, hour, min, sec, m, d, y = string.match(fn, "^(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv$")
@@ -288,12 +292,13 @@ local function get_log_files_list()
                 last_log_day_time = log_day_time
                 --log("last_log: %s", last_log)
             end
+
+            m_tables.list_ordered_insert(on_disk_date_list, log_day, compare_dates_inc, 2)
+            --m_tables.table_print("on_disk_date_list", on_disk_date_list)
         end
     end
     log("latest day: %s", last_day)
     log("last_log: %s", last_log_day_time)
-
-
 
 
     local log_files_list_all = {}
@@ -398,7 +403,7 @@ local function read_and_index_file_list()
             --log("read_and_index_file_list: total_lines: %s, total_seconds: %s, col_with_data_str: [%s], all_col_str: [%s]", total_lines, total_seconds, col_with_data_str, all_col_str)
             log("read_and_index_file_list: total_seconds: %s", total_seconds)
             m_tables.list_ordered_insert(model_name_list, modelName, compare_names, 2)
-            m_tables.list_ordered_insert(date_list, model_day, compare_dates, 2)
+            m_tables.list_ordered_insert(date_list, model_day, compare_dates_inc, 2)
 
             -- due to cpu load, early exit
             if is_new then
@@ -452,8 +457,9 @@ local function filter_log_file_list(filter_model_name, filter_date, need_update)
 
     m_tables.table_clear(log_file_list_filtered)
 
-    for i = 1, #m_index_file.log_files_index_info do
-        local log_file_info = m_index_file.log_files_index_info[i]
+    local log_files_index_info = m_index_file.getFileListDec()
+    for i = 1, #log_files_index_info do
+        local log_file_info = log_files_index_info[i]
 
         --log("filter_log_file_list: %d. %s", i, log_file_info.file_name)
 
@@ -1504,7 +1510,7 @@ function M.run(event, touchState)
 
 
     if state == STATE.SPLASH then
-        log("STATE.SPLASH")
+        --log("STATE.SPLASH")
         return state_SPLASH()
 
     elseif state == STATE.SELECT_INDEX_TYPE_INIT then

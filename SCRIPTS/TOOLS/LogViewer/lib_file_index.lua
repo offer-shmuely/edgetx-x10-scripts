@@ -11,13 +11,29 @@ M.idx_file_name = "/LOGS/log-viewer.csv"
 
 M.log_files_index_info = {}
 
+function M.compare_file_names_inc(a, b)
+    local a1 = string.sub(a.file_name, -21, -5)
+    local b1 = string.sub(b.file_name, -21, -5)
+    --M.m_log.info("ab, %s ? %s", a, b)
+    --M.m_log.info("a1b1, %s ? %s", a1, b1)
+    return a1 < b1
+end
+
+function M.compare_file_names_dec(a, b)
+    local a1 = string.sub(a.file_name, -21, -5)
+    local b1 = string.sub(b.file_name, -21, -5)
+    --M.m_log.info("ab, %s ? %s", a, b)
+    --M.m_log.info("a1b1, %s ? %s", a1, b1)
+    return a1 > b1
+end
+
 function M.indexInit()
     M.m_log.info("indexInit()")
     M.m_tables.table_clear(M.log_files_index_info)
 end
 
 local function updateFile(file_name, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str)
-    M.m_log.info("updateFile(%s)", file_name)
+    --M.m_log.info("updateFile(%s)", file_name)
 
     local new_file = {
         file_name = m_utils.trim(file_name),
@@ -29,7 +45,7 @@ local function updateFile(file_name, start_time, end_time, total_seconds, total_
         col_with_data_str = m_utils.trim(col_with_data_str),
         all_col_str = m_utils.trim(all_col_str)
     }
-    M.m_tables.list_ordered_insert(M.log_files_index_info, new_file, M.m_tables.compare_file_names, 1)
+    M.m_tables.list_ordered_insert(M.log_files_index_info, new_file, M.compare_file_names_inc, 1)
 end
 
 function M.indexPrint(prefix)
@@ -126,7 +142,7 @@ function M.indexRead()
         M.indexSave()
     end
 
-    M.indexPrint("end of indexRead")
+    --M.indexPrint("end of indexRead")
 end
 
 function M.getFileDataInfo(file_name)
@@ -160,6 +176,16 @@ function M.getFileDataInfo(file_name)
 
     M.indexSave()
     return true, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str
+end
+
+function M.getFileListDec()
+    local log_files_index_info_dec = {}
+    for i = 1, #M.log_files_index_info, 1 do
+        local info = M.log_files_index_info[i]
+        --M.m_log.info("getFileListDec(): adding f: %s", info.file_name)
+        M.m_tables.list_ordered_insert(log_files_index_info_dec, info, M.compare_file_names_dec, 1)
+    end
+    return log_files_index_info_dec
 end
 
 function M.indexSave()
