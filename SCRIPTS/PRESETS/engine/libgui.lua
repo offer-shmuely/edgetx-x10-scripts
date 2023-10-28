@@ -137,7 +137,7 @@ function M.newGUI()
         elseif font_size == M.FONT_SIZES.FONT_6 then
             v_offset = 0
         end
-        return ts_w, ts_h, v_offset
+        return ts_w, ts_h +2*v_offset, v_offset
     end
 
     function gui.drawText(x, y, text, flags, inversColor)

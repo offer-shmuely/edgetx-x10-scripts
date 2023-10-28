@@ -78,6 +78,7 @@ local state = STATE.SPLASH
 local ImgSplash = Bitmap.open(script_folder .. "img/splash.png")
 local ImgSummary = Bitmap.open(script_folder .. "img/summary.png")
 local ImgBackground = Bitmap.open(script_folder .. "img/background.png")
+local ImgBackground2 = Bitmap.open(script_folder .. "img/background2.png")
 
 ---------------------------------------------------------------------------------------------------
 local function getVer()
@@ -107,6 +108,7 @@ local function state_SPLASH(event, touchState)
     return 0
 end
 
+---------------------------------------------------------------------------------------------------
 local function state_INIT()
     log("PRESETS: init - start")
     preset_list[#preset_list+1] = "---"
@@ -123,9 +125,7 @@ local function state_INIT()
 end
 
 ---------------------------------------------------------------------------------------------------
-
 local function on_change_preset_selection(i)
-
     dd_preset_folder_name = preset_list[i]
     dd_preset_folder_name_idx = i
     log("Selected model-name: " .. dd_preset_folder_name)
@@ -139,7 +139,6 @@ local function on_change_preset_selection(i)
 end
 
 ---------------------------------------------------------------------------------------------------
-
 local function state_SELECTION_INIT()
     ctx1.label(40, 60, 60, 24, "")
     --ctx1.label(40, 60, 60, 24, "Preset:")
@@ -169,6 +168,7 @@ local function state_SELECTION_INIT()
     return 0
 end
 
+---------------------------------------------------------------------------------------------------
 local function state_SELECTION(event, touchState)
     if event == EVT_TOUCH_FIRST and (touchState.x <= 40 and touchState.y >= 100 and touchState.y <= 160) then
         print(string.format("(%s) %s - %s", page, touchState.x, touchState.y))
@@ -189,10 +189,7 @@ local function state_SELECTION(event, touchState)
         end
     end
 
-    lcd.clear()
-    lcd.drawBitmap(ImgBackground, 0, 0)
-
-    m_utils.drawTitle("What Preset do you like Today...", false, false, true)
+    m_utils.drawTitle("What Preset do you like Today...", false, true, ImgBackground)
 
     --lcd.drawFilledRectangle(40, 110, 400, 100, BLACK, 20)
     if preset_info["about"] ~= nil then
@@ -210,9 +207,9 @@ local function state_SELECTION(event, touchState)
 
     --local txt1 = string.format("/%s/%s", preset_info["category"], preset_info["name"])
     local txt1 = string.format("Category: %s", preset_info["category"])
-    local txt2 = string.format("ver:%s   author:%s", preset_info["ver"], preset_info["author"])
-    lcd.drawText(10, 220, txt1, m_utils.FONT_6, BLACK)
-    lcd.drawText(10, 240, txt2, m_utils.FONT_6, BLACK)
+    local txt2 = string.format("ver: %s  author: %s", preset_info["ver"], preset_info["author"])
+    lcd.drawText(10, 252, txt1, m_utils.FONT_6 + BLACK)
+    lcd.drawText(300, 250, txt2, m_utils.FONT_6 + BLACK)
 
     return 0
 end
@@ -254,8 +251,7 @@ local function state_PRESET_OPTIONS_INIT()
 end
 
 local function state_PRESET_OPTIONS(event, touchState)
-    log("state_PRESET_OPTIONS()")
-
+    --log("state_PRESET_OPTIONS()")
 
     if event == EVT_TOUCH_FIRST and (touchState.x <= 40 and touchState.y >= 100 and touchState.y <= 160) then
         print(string.format("(%s) %s - %s", page, touchState.x, touchState.y))
@@ -285,8 +281,7 @@ local function state_PRESET_OPTIONS(event, touchState)
         return 0
     end
 
-    lcd.clear()
-    m_utils.drawTitle("Preset: " .. preset_info["name"], true, true, true)
+    m_utils.drawTitle("Preset: " .. preset_info["name"], true, true, ImgBackground2)
 
     local rc = preset_script_chunk.draw_page(event, touchState)
     if rc == m_utils.PRESET_RC.NEXT_PAGE then
@@ -301,14 +296,13 @@ end
 local function state_CONFIRM_REQUEST_INIT(event)
     log("state_CONFIRM_REQUEST_INIT()")
 
-    lcd.clear()
-    m_utils.drawTitle("Model Updated", true, true, false)
+    m_utils.drawTitle("Model Updated", true, false, ImgBackground2)
 
     lcd.drawBitmap(ImgSummary, 300, 60)
 
-    lcd.drawText(60, 80 , "Update the model?", COLOR_THEME_PRIMARY1)
-    lcd.drawText(60, 110, "Note: this will change the current plane settings!!", COLOR_THEME_PRIMARY1)
-    lcd.drawText(60, 220, "Press Long [Enter] to save", COLOR_THEME_PRIMARY1)
+    lcd.drawText(60, 80 , "Update the current model?", COLOR_THEME_PRIMARY1)
+    lcd.drawText(60, 180, "Note: this will change the current plane settings!!", COLOR_THEME_PRIMARY1)
+    lcd.drawText(60, 220, "Hold [Enter] to apply changes...", COLOR_THEME_PRIMARY1)
 
     if event == EVT_TOUCH_FIRST then
         log("state_ON_END() - exit")
@@ -356,13 +350,12 @@ end
 local function state_ON_END(event, touchState)
     log("state_ON_END()")
 
-    lcd.clear()
-    m_utils.drawTitle("Model Updated", true, false, false)
+    m_utils.drawTitle("Model Updated", false, false, ImgBackground2)
 
     lcd.drawBitmap(ImgSummary, 300, 60)
 
     lcd.drawText(70, 90, "Model successfully updated!", COLOR_THEME_PRIMARY1)
-    lcd.drawText(100, 130, "Press RTN to exit", COLOR_THEME_PRIMARY1)
+    lcd.drawText(100, 130, "Hold [RTN] to exit.", COLOR_THEME_PRIMARY1)
 
     if event == EVT_TOUCH_FIRST then
         log("state_ON_END() - exit")
@@ -373,11 +366,10 @@ end
 ---------------------------------------------------------------------------------------------------
 
 local function state_ERROR_PAGE(event, touchState)
-    lcd.clear()
-    m_utils.drawTitle("Error", true, false, false)
+    m_utils.drawTitle("Error", false, false, ImgBackground2)
 
     lcd.drawText(40, 80, error_desc, COLOR_THEME_PRIMARY1)
-    lcd.drawText(100, 200, "Press RTN to exit", COLOR_THEME_PRIMARY1)
+    lcd.drawText(100, 200, "Hold [RTN] to exit.", COLOR_THEME_PRIMARY1)
 
     if event == EVT_VIRTUAL_ENTER_LONG or event == EVT_VIRTUAL_PREV_PAGE or event == EVT_VIRTUAL_EXIT then
         log("state_ERROR_PAGE() - exit")

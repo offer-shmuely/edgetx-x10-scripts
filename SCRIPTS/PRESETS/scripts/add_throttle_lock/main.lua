@@ -11,8 +11,8 @@ local ctx2
 
 ---------------------------------------------------------------------------------------------------
 local Fields = {
-    arm_switch = { text = 'Safety switch:', x = 200, y = 60 , w = 50, is_visible = 1, default_value = 6, avail_values = { "SA", "SB", "SC", "SD", "SE", "SF", "SG", "SH" } },
-    motor_ch   = { text = 'Motor Channel:', x = 200, y = 90 , w = 50, is_visible = 1, default_value = 3, avail_values={ "CH1", "CH2", "CH3", "CH4", "CH5", "CH6", "CH7", "CH8", "CH9", "CH10" } },
+    arm_switch = { text = 'Arm switch:'    , x = 200, y = 155 , w = 50, is_visible = 1, default_value = 6, avail_values = { "SA", "SB", "SC", "SD", "SE", "SF", "SG", "SH" } },
+    motor_ch   = { text = 'Motor Channel:' , x = 200, y = 180 , w = 50, is_visible = 1, default_value = 3, avail_values={ "CH1", "CH2", "CH3", "CH4", "CH5", "CH6", "CH7", "CH8", "CH9", "CH10" } },
 }
 ---------------------------------------------------------------------------------------------------
 
@@ -31,6 +31,10 @@ function M.init()
     local menu_h = 26
 
     ctx2 = m_libgui.newGUI()
+    ctx2.label(menu_x    ,  50, menu_w, menu_h, "also know as:")
+    ctx2.label(menu_x +10,  70, menu_w, menu_h, "* safety switch")
+    ctx2.label(menu_x +10,  90, menu_w, menu_h, "* arm switch")
+    ctx2.label(menu_x +10, 110, menu_w, menu_h, "* throttle lock switch")
 
     local p = Fields.arm_switch
     ctx2.label(menu_x, p.y, menu_w, menu_h, p.text)
@@ -40,7 +44,7 @@ function M.init()
     ctx2.label(menu_x, p.y, menu_w, menu_h, p.text)
     p.gui_obj = ctx2.dropDown(p.x, p.y, p.w, menu_h, p.avail_values, p.default_value)
 
-    return m_utils.PRESET_RC.OK_CONTINUE
+    return nil
 end
 
 function M.draw_page(event, touchState)
