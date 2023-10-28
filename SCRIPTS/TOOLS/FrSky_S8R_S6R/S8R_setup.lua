@@ -17,7 +17,8 @@
 
 chdir("/SCRIPTS/TOOLS/FrSky_S8R_S6R")
 
-local version = "v2.05"
+-- based on FrSky version 2.01
+local version = "v2.06-etx"
 
 local VALUE = 0
 local COMBO = 1
@@ -38,61 +39,58 @@ local fields = {}
 local modifications = {}
 local wingBitmaps = {}
 local mountBitmaps = {}
-local margin = 1
-local spacing = 8
-local numberPerPage = 7
-local counter = 0
+local margin = 10
+local spacing = 22
+local numberPerPage = 11
 local touch_d0 = 0
+local is_gyro_enabled = 1
 
-local configFields = {
-    { "Wing type", COMBO, 0x80, nil, { "Normal", "Delta", "VTail" } },
-    { "Mounting type", COMBO, 0x81, nil, { "Horz", "Horz rev.", "Vert", "Vert rev." } },
+local FieldsGroup1 = {
+    --{"Enable/Disable Gyro", COMBO, 0x9C, nil, {"Gyro Disabled", "Gyro Enabled" }                               , nil, 1 },
+    {"Enable/Disable Gyro", COMBO, 0x9C, nil, {"OFF", "ON" }                                                   , nil, 1 },
+    { "Wing type"         , COMBO, 0x80, nil, {"Normal", "Delta", "VTail" }                                    , nil, 1 },
+    { "Mounting type"     , COMBO, 0x81, nil, {"Horizon", "Horizon Reversed", "Vertical", "Vertical Reversed" }, nil, 1 },
 }
 
 local wingBitmapsFile = { "bmp/plane.bmp", "bmp/delta.bmp", "bmp/vtail.bmp" }
 local mountBitmapsFile = { "bmp/horz.bmp", "bmp/horz-r.bmp", "bmp/vert.bmp", "bmp/vert-r.bmp" }
 
-local settingsFields = {
-    {"Receiver Gyro Functions", COMBO, 0x9C, nil, { "Disabled", "Enabled" } },
-    {"Mode (Quick Mode):", COMBO, 0xAA, nil, { "Full (with hover&knife)", "Simple (no hover, no knife)" } },
-    {"CH5 mode", COMBO, 0xA8, nil, { "CH5 as AIL2", "CH5 as AUX1" } },
-    {"CH6 mode", COMBO, 0xA9, nil, { "CH6 as ELE2", "CH6 as AUX2" } },
+local FieldsGroup2 = {
+    --{"Receiver Gyro Functions", COMBO, 0x9C, nil, { "Disabled", "Enabled" } },
+    {"Modes", HEADER},
+    {"    Mode (Quick Mode):", COMBO, 0xAA, nil, {"Full (with hover & knife)", "Simple (no hover, no knife)"} },
+    {"    CH5 mode"          , COMBO, 0xA8, nil, {"CH5 as AIL2", "CH5 not control by gyro"}                 },
+    {"    CH6 mode"          , COMBO, 0xA9, nil, {"CH6 as ELE2", "CH6 not control by gyro"}                 },
 
     {"Main stabilization", HEADER},
-    {"    gain: AIL", VALUE, 0x85, nil, 0, 200, "%"},
-    {"    gain: ELE", VALUE, 0x86, nil, 0, 200, "%"},
-    {"    gain: RUD", VALUE, 0x87, nil, 0, 200, "%"},
+    {"    Gain: AIL", VALUE, 0x85, nil, 0, 200, 1, "%"},
+    {"    Gain: ELE", VALUE, 0x86, nil, 0, 200, 1, "%"},
+    {"    Gain: RUD", VALUE, 0x87, nil, 0, 200, 1, "%"},
 
     {"Directions", HEADER},
-    {"    Directions: AIL", COMBO, 0x82, nil, { "Normal", "Inverted" }, { 255, 0 } },
-    {"    Directions: ELE", COMBO, 0x83, nil, { "Normal", "Inverted" }, { 255, 0 } },
-    {"    Directions: RUD", COMBO, 0x84, nil, { "Normal", "Inverted" }, { 255, 0 } },
-    {"    Directions: AIL2", COMBO, 0x9A, nil, { "Normal", "Inverted" }, { 255, 0 } },
-    {"    Directions: ELE2", COMBO, 0x9B, nil, { "Normal", "Inverted" }, { 255, 0 } },
+    {"    Directions: AIL" , COMBO, 0x82, nil, {"Normal", "Inverted"}, {255, 0}, 1 },
+    {"    Directions: ELE" , COMBO, 0x83, nil, {"Normal", "Inverted"}, {255, 0}, 1 },
+    {"    Directions: RUD" , COMBO, 0x84, nil, {"Normal", "Inverted"}, {255, 0}, 1 },
+    {"    Directions: AIL2", COMBO, 0x9A, nil, {"Normal", "Inverted"}, {255, 0}, 1 },
+    {"    Directions: ELE2", COMBO, 0x9B, nil, {"Normal", "Inverted"}, {255, 0}, 1 },
 
     {"Auto Level:", HEADER},
-    {"    gain AIL", VALUE, 0x88, nil, 0, 200, "%"},
-    {"    gain ELE", VALUE, 0x89, nil, 0, 200, "%"},
-    {"    offset AIL", VALUE, 0x91, nil, -20, 20, "%", 0x6C},
-    {"    offset ELE", VALUE, 0x92, nil, -20, 20, "%", 0x6C},
+    {"    Gain: AIL"  , VALUE, 0x88, nil,   0, 200, 1, "%"},
+    {"    Gain: ELE"  , VALUE, 0x89, nil,   0, 200, 1, "%"},
+    {"    Offset: AIL", VALUE, 0x91, nil, -20,  20, 1, "%", 0x6C},
+    {"    Offset: ELE", VALUE, 0x92, nil, -20,  20, 1, "%", 0x6C},
 
     {"Hover:", HEADER},
-    {"    gain ELE", VALUE, 0x8C, nil, 0, 200, "%"},
-    {"    gain RUD", VALUE, 0x8D, nil, 0, 200, "%"},
-    {"    offset ELE", VALUE, 0x95, nil, -20, 20, "%", 0x6C},
-    {"    offset RUD", VALUE, 0x96, nil, -20, 20, "%", 0x6C},
+    {"    Gain: ELE"  , VALUE, 0x8C, nil,   0, 200, 1, "%"},
+    {"    Gain: RUD"  , VALUE, 0x8D, nil,   0, 200, 1, "%"},
+    {"    Offset: ELE", VALUE, 0x95, nil, -20,  20, 1, "%", 0x6C},
+    {"    Offset: RUD", VALUE, 0x96, nil, -20,  20, 1, "%", 0x6C},
 
-    {"Knife Edge:", HEADER},
-    {"    gain AIL", VALUE, 0x8E, nil, 0, 200, "%"},
-    {"    gain RUD", VALUE, 0x90, nil, 0, 200, "%"},
-    {"    offset AIL", VALUE, 0x97, nil, -20, 20, "%", 0x6C},
-    {"    offset RUD", VALUE, 0x99, nil, -20, 20, "%", 0x6C},
-}
-
-local calibrationFields = {
-    { "X:", VALUE, 0x9E, 0, -100, 100, "%" },
-    { "Y:", VALUE, 0x9F, 0, -100, 100, "%" },
-    { "Z:", VALUE, 0xA0, 0, -100, 100, "%" }
+    {"Knife Edge:"   , HEADER},
+    {"    Gain: AIL"  , VALUE, 0x8E, nil,   0, 200, 1, "%"},
+    {"    Gain: RUD"  , VALUE, 0x90, nil,   0, 200, 1, "%"},
+    {"    Offset: AIL", VALUE, 0x97, nil, -20,  20, 1, "%", 0x6C},
+    {"    Offset: RUD", VALUE, 0x99, nil, -20,  20, 1, "%", 0x6C},
 }
 
 local function is_simulator()
@@ -104,13 +102,9 @@ local function drawScreenTitle(title, page, pages)
     --if math.fmod(math.floor(getTime() / 100), 10) == 0 then
     --    title = version
     --end
-    if LCD_W == 480 then
-        lcd.drawFilledRectangle(0, 0, LCD_W, 30, TITLE_BGCOLOR)
-        lcd.drawText(50, 5, title.. " - "..version, MENU_TITLE_COLOR)
-        lcd.drawText(LCD_W - 40, 5, page .. "/" .. pages, MENU_TITLE_COLOR)
-    else
-        lcd.drawScreenTitle(title, page, pages)
-    end
+    lcd.drawFilledRectangle(0, 0, LCD_W, 30, TITLE_BGCOLOR)
+    lcd.drawText(50, 5, title.. " - "..version, MENU_TITLE_COLOR)
+    lcd.drawText(LCD_W - 40, 5, page .. "/" .. pages, MENU_TITLE_COLOR)
 end
 
 -- Change display attribute to current field
@@ -134,7 +128,13 @@ end
 
 -- Select the next or previous page
 local function selectPage(step)
-    page = 1 + ((page + step - 1 + #pages) % #pages)
+    if page == 1 and step < 0 then
+        return
+    end
+    if page + step > #pages then
+        return
+    end
+    page = page + step
     refreshIndex = 0
     calibrationStep = 0
     pageOffset = 0
@@ -142,18 +142,10 @@ end
 
 -- Select the next or previous editable field
 local function selectField(step)
-    --local old_current = current
-    --current = 1 + ((current + step - 1 + #fields) % #fields)
     if step < 0 and current+step >= 1 then
         current = current + step
-        --print("current-a: "..old_current.."-->"..current)
     elseif step > 0 and current+step <= #fields then
         current = current + step
-        --print("current-b: "..old_current.."-->"..current)
-    end
-
-    if fields[current][2] == HEADER then
-        current = 1 + ((current + step - 1 + #fields) % #fields)
     end
 
     if current > numberPerPage + pageOffset then
@@ -164,21 +156,15 @@ local function selectField(step)
 end
 
 local function drawProgressBar()
-    if LCD_W == 480 then
-        local width = (100 * refreshIndex) / #fields
-        --print(string.format("111 - width: %s, refreshIndex: %s/%s",width, refreshIndex, #fields))
-        lcd.drawRectangle(330, 12, 100, 8, GREY)
-        lcd.drawFilledRectangle(331, 12, width, 6, GREY)
-    else
-        local width = (60 * refreshIndex) / #fields
-        lcd.drawRectangle(45, 1, 60, 6)
-        lcd.drawFilledRectangle(47, 3, width, 2)
-    end
+    local width = (100 * refreshIndex) / #fields
+    lcd.drawRectangle(330, 12, 100, 8, GREY)
+    lcd.drawFilledRectangle(331, 12, width, 6, GREY)
 end
 
 -- Redraw the current page
 local function redrawFieldsPage(event, touchState)
     lcd.clear()
+    lcd.drawFilledRectangle(0,0, LCD_W, LCD_H, LIGHTWHITE);
     drawScreenTitle("FrSky S8R/S6R Gyro setup", page, #pages)
 
     if refreshIndex < #fields then
@@ -206,19 +192,27 @@ local function redrawFieldsPage(event, touchState)
             attr = attr + BOLD
         end
 
-        lcd.drawText(10, margin + spacing * index, field[1], attr)
+        if field[7] == nil or field[7] == 1 then
+            lcd.drawText(10, margin + spacing * index, field[1], attr)
 
-        if field[4] == nil and field[2] ~= HEADER then
-            lcd.drawText(280, margin + spacing * index, "---", attr)
-        else
-            if field[2] == VALUE then
-                lcd.drawNumber(280, margin + spacing * index, field[4], attr)
-            elseif field[2] == COMBO then
-                if field[4] >= 0 and field[4] < #(field[5]) then
-                    lcd.drawText(280, margin + spacing * index, field[5][1 + field[4]], attr)
+            if field[4] == nil and field[2] ~= HEADER then
+                lcd.drawText(280, margin + spacing * index, "---", attr)
+            else
+                if field[2] == VALUE then
+                    lcd.drawNumber(280, margin + spacing * index, field[4], attr)
+                elseif field[2] == COMBO then
+                    if field[4] >= 0 and field[4] < #(field[5]) then
+                        lcd.drawText(280, margin + spacing * index, field[5][1 + field[4]], attr)
+                    end
                 end
             end
         end
+
+        if index == 1 and is_gyro_enabled == 0 then
+            lcd.drawText(120, 120, "Gyro Disabled", DBLSIZE + GREY)
+            lcd.drawText(20, 160, "Receiver operate as simple RX", DBLSIZE + GREY)
+        end
+
     end
 end
 
@@ -279,7 +273,7 @@ local function refreshNext()
                         value = b1 * 256 + b2
                         value = value - bit32.band(value, 0x8000) * 2
                     end
-                    if field[2] == COMBO and #field == 6 then
+                    if field[2] == COMBO and #field >= 6 and field[6] ~= nil then
                         for index = 1, #(field[6]), 1 do
                             if value == field[6][index] then
                                 value = index - 1
@@ -288,12 +282,12 @@ local function refreshNext()
                                 value = 0
                             end
                         end
-                    elseif field[2] == COMBO and #field == 5 then
+                    elseif field[2] == COMBO then
                         if value >= #field[5] then
                             value = #field[5] - 1
                         end
-                    elseif field[2] == VALUE and #field == 8 then
-                        value = value - field[8] + field[5]
+                    elseif field[2] == VALUE and #field >= 9 and field[9] then
+                        value = value - field[9] + field[5]
                     end
                     fields[refreshIndex + 1][4] = value
                     refreshIndex = refreshIndex + 1
@@ -311,10 +305,10 @@ end
 
 local function updateField(field)
     local value = field[4]
-    if field[2] == COMBO and #field == 6 then
+    if field[2] == COMBO and #field >= 6 and field[6] ~= nil  then
         value = field[6][1 + value]
-    elseif field[2] == VALUE and #field == 8 then
-        value = value + field[8] - field[5]
+    elseif field[2] == VALUE and #field >= 9 and field[9] then
+        value = value + field[9] - field[5]
     end
     modifications[#modifications + 1] = { field[3], value }
 end
@@ -351,7 +345,7 @@ local function runFieldsPage(event, touchState)
                 end
                 touch_d0 = d
             elseif d > touch_d0 then
-                if pageOffset < #settingsFields - numberPerPage then
+                if pageOffset < #fields - numberPerPage then
                     pageOffset = pageOffset +1
                 end
                 touch_d0 = d
@@ -364,60 +358,69 @@ local function runFieldsPage(event, touchState)
 end
 
 local function runConfigPage(event, touchState)
-    fields = configFields
-    local result = runFieldsPage(event, touchState)
-    if LCD_W == 128 then
-        local mountText = { "Label is facing the sky", "Label is facing ground", "Label is left when", "Label is right when" }
-        if fields[2][4] ~= nil then
-            lcd.drawText(1, 30, "Pins toward tail")
-            lcd.drawText(1, 40, mountText[1 + fields[2][4]])
-            if fields[2][4] > 1 then
-                lcd.drawText(1, 50, "looking from the tail")
-            end
-        end
+    fields = FieldsGroup1
+
+    if fields[1][4] == 1 then
+        is_gyro_enabled = 1
+        fields[1][7] = 1
+        fields[2][7] = 1
+        fields[3][7] = 1
     else
-        if fields[1][4] ~= nil then
-            if LCD_W == 480 then
-                if wingBitmaps[1 + fields[1][4]] == nil then
-                    wingBitmaps[1 + fields[1][4]] = Bitmap.open(wingBitmapsFile[1 + fields[1][4]])
-                end
-                lcd.drawBitmap(wingBitmaps[1 + fields[1][4]], 10, 90)
-            else
-                lcd.drawPixmap(20, 28, wingBitmapsFile[1 + fields[1][4]])
-            end
-        end
+        is_gyro_enabled = 0
+        fields[1][7] = 1
+        fields[2][7] = 0
+        fields[3][7] = 0
+    end
+
+    local result = runFieldsPage(event, touchState)
+
+    if is_gyro_enabled == 1 then
         if fields[2][4] ~= nil then
-            if LCD_W == 480 then
-                if mountBitmaps[1 + fields[2][4]] == nil then
-                    mountBitmaps[1 + fields[2][4]] = Bitmap.open(mountBitmapsFile[1 + fields[2][4]])
-                end
-                lcd.drawBitmap(mountBitmaps[1 + fields[2][4]], 190, 110)
-            else
-                lcd.drawPixmap(128, 28, mountBitmapsFile[1 + fields[2][4]])
+            if wingBitmaps[1 + fields[2][4]] == nil then
+                wingBitmaps[1 + fields[2][4]] = Bitmap.open(wingBitmapsFile[1 + fields[2][4]])
             end
+            lcd.drawBitmap(wingBitmaps[1 + fields[2][4]], 10, 90)
+        end
+        if fields[3][4] ~= nil then
+            if mountBitmaps[1 + fields[3][4]] == nil then
+                mountBitmaps[1 + fields[3][4]] = Bitmap.open(mountBitmapsFile[1 + fields[3][4]])
+            end
+            lcd.drawBitmap(mountBitmaps[1 + fields[3][4]], 190, 110)
         end
     end
+
     return result
 end
 
 local function runSettingsPage(event, touchState)
-    fields = settingsFields
+    fields = FieldsGroup2
     return runFieldsPage(event, touchState)
+end
+
+local function runInfoPage(event, touchState)
+    lcd.clear()
+    lcd.drawFilledRectangle(0,0, LCD_W, LCD_H, LIGHTWHITE);
+    drawScreenTitle("FrSky S8R/S6R Gyro setup", page, #pages)
+    lcd.drawText(80, 30, "Switches Reminder", DBLSIZE)
+    lcd.drawText(20, 70, "CH9: Gain", BLACK)
+    lcd.drawText(20, 90, "CH10: +100 => stability disabled", BLACK)
+    lcd.drawText(20, 110, "CH10: 0 => wind rejection", BLACK)
+    lcd.drawText(20, 130, "CH10: -100 => self level", BLACK)
+    lcd.drawText(20, 150, "CH12: SW down => panic mode", BLACK)
+    lcd.drawText(20, 170, "CH12 x3 times: activate self-check ", BLACK)
+    return 0
 end
 
 -- Init
 local function init()
     current, edit, refreshState, refreshIndex = 1, false, 0, 0
-    if LCD_W == 480 then
-        margin = 10
-        spacing = 20
-        numberPerPage = 12
-        wingBitmapsFile = { "img/plane_b.png", "img/delta_b.png", "img/planev_b.png" }
-        mountBitmapsFile = { "img/up.png", "img/down.png", "img/vert.png", "img/vert-r.png" }
-    end
+    wingBitmapsFile = { "img/plane_b.png", "img/delta_b.png", "img/planev_b.png" }
+    mountBitmapsFile = { "img/up.png", "img/down.png", "img/vert.png", "img/vert-r.png" }
+
     pages = {
         runConfigPage,
         runSettingsPage,
+        runInfoPage,
     }
 end
 
@@ -426,7 +429,7 @@ local function run(event, touchState)
     if event == nil then
         error("Cannot be run as a model script!")
         return 2
-    elseif event == EVT_VIRTUAL_NEXT_PAGE then
+    elseif event == EVT_VIRTUAL_NEXT_PAGE and is_gyro_enabled == 1 then
         selectPage(1)
     elseif event == EVT_VIRTUAL_PREV_PAGE then
         killEvents(event)
