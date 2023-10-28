@@ -21,7 +21,7 @@ local M = {}
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2023
-local ver = "1.1"
+local ver = "1.2"
 
 function M.getVer()
     return ver
@@ -186,7 +186,7 @@ local function calculate_model_summary_list()
     local model_flight_count = {}
     for i = 1, #m_index_file.log_files_index_info do
         local flight_info = m_index_file.log_files_index_info[i]
-        log("model_summary_list: %d. %s = %d", i, flight_info.model_name, flight_info.flight_count)
+        --log("model_summary_list: %d. [%s]=%d (%s min)", i, flight_info.model_name, flight_info.flight_count, flight_info.duration)
 
         if model_flight_count[flight_info.model_name] == nil then
             log("model_summary_list: %d. first", i)
@@ -350,13 +350,10 @@ local function drawMain()
         -- draw top-bar
         lcd.drawFilledRectangle(0, 0, LCD_W, 20, TITLE_BGCOLOR)
         lcd.drawBitmap(img_bg2, 0, 0)
-    end
-
-    if selected_flight_date ~= nil then
-        lcd.drawText(30, 1, "/LOGS/" .. selected_flight_date, WHITE + SMLSIZE)
+        lcd.drawText(160, 1, "Flight History Viewer", WHITE + SMLSIZE)
+        lcd.drawText(450, 1, "v" .. ver, WHITE + SMLSIZE)
     end
 end
-
 
 function M.init()
 end
@@ -367,12 +364,7 @@ function M.run(event, touchState)
         return 2
     end
 
-    --log("run() ---------------------------")
-    --log("event: %s", event)
-
-
     drawMain()
-
 
     if state == STATE.SPLASH then
         log("STATE.SPLASH")
