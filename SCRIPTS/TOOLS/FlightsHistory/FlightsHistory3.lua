@@ -21,10 +21,10 @@ local M = {}
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2023
-local ver = "1.2"
+local app_ver = "1.3"
 
 function M.getVer()
-    return ver
+    return app_ver
 end
 
 --local m_log2 = require("lib_log")
@@ -351,7 +351,7 @@ local function drawMain()
         lcd.drawFilledRectangle(0, 0, LCD_W, 20, TITLE_BGCOLOR)
         lcd.drawBitmap(img_bg2, 0, 0)
         lcd.drawText(160, 1, "Flight History Viewer", WHITE + SMLSIZE)
-        lcd.drawText(450, 1, "v" .. ver, WHITE + SMLSIZE)
+        lcd.drawText(440, 1, "v" .. app_ver, WHITE + SMLSIZE)
     end
 end
 

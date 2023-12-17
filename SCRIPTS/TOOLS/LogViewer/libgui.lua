@@ -2,8 +2,11 @@
 -- The dynamically loadable part of the shared Lua GUI library.          --
 --                                                                       --
 -- Author:  Jesper Frickmann                                             --
--- Date:    2022-11-20                                                   --
--- Version: 1.0.2                                                        --
+-- Version: 1.0.0   Date: 2021-12-20                                     --
+-- Version: 1.0.1   Date: 2022-05-05                                     --
+-- Version: 1.0.2   Date: 2022-11-20                                     --
+-- Version: 1.0.2   Date: 2023-07                                        --
+-- Version: 1.0.3   Date: 2023-12                                        --
 --                                                                       --
 -- Copyright (C) EdgeTX                                                  --
 --                                                                       --
@@ -22,7 +25,7 @@
 local M = { }
 
 function M.getVer()
-    return "1.0.2"
+    return "1.0.3"
 end
 
 -- Radius of slider dot
@@ -73,6 +76,25 @@ function M.newGUI()
     local scrolling = false
     local lastEvent = 0
 
+
+    function gui.lcdSizeTextFixed(txt, font_size)
+        local ts_w, ts_h = lcd.sizeText(txt, font_size)
+
+        local v_offset = 0
+        if font_size == M.FONT_SIZES.FONT_38 then
+            v_offset = -11
+        elseif font_size == M.FONT_SIZES.FONT_16 then
+            v_offset = -5
+        elseif font_size == M.FONT_SIZES.FONT_12 then
+            v_offset = -4
+        elseif font_size == M.FONT_SIZES.FONT_8 then
+            v_offset = -3
+        elseif font_size == M.FONT_SIZES.FONT_6 then
+            v_offset = 0
+        end
+        return ts_w, ts_h +2*v_offset, v_offset
+    end
+
     -- Translate coordinates for sub-GUIs
     function gui.translate(x, y)
         if gui.parent then
@@ -120,24 +142,6 @@ function M.newGUI()
         x2, y2 = gui.translate(x2, y2)
         x3, y3 = gui.translate(x3, y3)
         lcd.drawFilledTriangle(x1, y1, x2, y2, x3, y3, flags)
-    end
-
-    function gui.lcdSizeTextFixed(txt, font_size)
-        local ts_w, ts_h = lcd.sizeText(txt, font_size)
-
-        local v_offset = 0
-        if font_size == M.FONT_SIZES.FONT_38 then
-            v_offset = -11
-        elseif font_size == M.FONT_SIZES.FONT_16 then
-            v_offset = -5
-        elseif font_size == M.FONT_SIZES.FONT_12 then
-            v_offset = -4
-        elseif font_size == M.FONT_SIZES.FONT_8 then
-            v_offset = -3
-        elseif font_size == M.FONT_SIZES.FONT_6 then
-            v_offset = 0
-        end
-        return ts_w, ts_h +2*v_offset, v_offset
     end
 
     function gui.drawText(x, y, text, flags, inversColor)
@@ -264,18 +268,6 @@ function M.newGUI()
             gui.onEvent(event, touchState)
         end
         lastEvent = event
-        --if not event then -- widget mode; event == nil
-        --    if M.widgetRefresh then
-        --        M.widgetRefresh()
-        --    else
-        --        gui.drawText(1, 1, "err: widget not in app-mode")
-        --        --gui.drawText(1, 25, "function was loaded.")
-        --    end
-        --else -- full screen mode (app-mode)
-        --    gui.draw(false)
-        --    gui.onEvent(event, touchState)
-        --end
-        --lastEvent = event
     end -- run(...)
 
     -----------------------------------------------------------------------------------------------
@@ -294,8 +286,8 @@ function M.newGUI()
         local guiFocus = not gui.parent or (focused and gui.parent.editing)
         for idx, element in ipairs(elements) do
             -- Clients may provide an update function for elements
-            if element.update then
-                element.update(element)
+            if element.onUpdate then
+                element.onUpdate(element)
             end
             if not element.hidden then
                 element.draw(focus == idx and guiFocus)
@@ -413,7 +405,8 @@ function M.newGUI()
         local self = {
             title = title,
             flags = bit32.bor(flags or M.flags, VCENTER, M.colors.primary1),
-            disabled = true
+            disabled = true,
+            hidden= false,
         }
 
         function self.draw(focused)
@@ -442,7 +435,8 @@ function M.newGUI()
         local self = {
             title = title,
             flags = bit32.bor(flags or M.flags, VCENTER, M.colors.primary1),
-            disabled = true
+            disabled = true,
+            hidden= false,
         }
 
         function self.draw(focused)
@@ -471,7 +465,9 @@ function M.newGUI()
         local self = {
             title = title,
             callBack = callBack or doNothing,
-            flags = bit32.bor(flags or M.flags, CENTER, VCENTER)
+            flags = bit32.bor(flags or M.flags, CENTER, VCENTER),
+            disabled = false,
+            hidden= false
         }
 
         function self.draw(focused)
@@ -505,7 +501,9 @@ function M.newGUI()
             title = title,
             value = value,
             callBack = callBack or doNothing,
-            flags = bit32.bor(flags or M.flags, CENTER, VCENTER)
+            flags = bit32.bor(flags or M.flags, CENTER, VCENTER),
+            disabled = false,
+            hidden= false
         }
 
         function self.draw(focused)
@@ -545,13 +543,18 @@ function M.newGUI()
     -----------------------------------------------------------------------------------------------
 
     -- Create a number that can be edited
-    function gui.number(x, y, w, h, value, onChangeValue, flags)
+    function gui.number(x, y, w, h, value, onChangeValue, flags, min, max)
         local self = {
             value = value,
             onChangeValue = onChangeValue or onChangeDefault,
             flags = bit32.bor(flags or M.flags, VCENTER),
-            editable = true
+            editable = true,
+            disabled = false,
+            hidden= false,
+            min_val = min,
+            max_val = max
         }
+
         local d0
 
         function self.draw(focused)
@@ -581,9 +584,13 @@ function M.newGUI()
                     self.value = value
                     gui.editing = false
                 elseif event == EVT_VIRTUAL_INC then
-                    self.value = self.onChangeValue(1, self)
+                    if self.value < self.max_val then
+                        self.value = self.onChangeValue(1, self)
+                    end
                 elseif event == EVT_VIRTUAL_DEC then
-                    self.value = self.onChangeValue(-1, self)
+                    if self.value > self.min_val then
+                        self.value = self.onChangeValue(-1, self)
+                    end
                 elseif event == EVT_TOUCH_FIRST then
                     d0 = 0
                 elseif event == EVT_TOUCH_SLIDE then
@@ -604,6 +611,7 @@ function M.newGUI()
     end -- number(...)
 
     -----------------------------------------------------------------------------------------------
+
     -- Create a display of current time on timer[tmr]
     -- Set timer.value to show a different value
     function gui.timer(x, y, w, h, tmr, onChangeValue, flags)
@@ -611,6 +619,8 @@ function M.newGUI()
             tmr = tmr,
             onChangeValue = onChangeValue or onChangeDefault,
             flags = bit32.bor(flags or M.flags, VCENTER),
+            disabled = false,
+            hidden= false,
             editable = true
         }
         local value
@@ -684,6 +694,8 @@ function M.newGUI()
         local self = {
             items = items or { "No items!" },
             flags = bit32.bor(flags or M.flags, VCENTER),
+            disabled = false,
+            hidden= false,
             editable = true,
             selected = 1
         }
@@ -742,7 +754,6 @@ function M.newGUI()
         end -- draw()
 
         function self.onEvent(event, touchState)
-            print(string.format("menu - onEvent"))
             local visibleCount = math.min(visibleCount, #self.items)
 
             if moving ~= 0 then
@@ -787,28 +798,22 @@ function M.newGUI()
                     elseif M.match(event, EVT_VIRTUAL_NEXT, EVT_VIRTUAL_PREV) then
                         if event == EVT_VIRTUAL_NEXT then
                             selected = math.min(#self.items, selected + 1)
-                            print(string.format("EVT_VIRTUAL_NEXT --> selected: %d", selected))
                         elseif event == EVT_VIRTUAL_PREV then
                             selected = math.max(1, selected - 1)
-                            print(string.format("EVT_VIRTUAL_PREV --> selected: %d", selected))
                         end
                         adjustScroll()
-                        --callBack(self, "temp") --???
                     elseif event == EVT_VIRTUAL_ENTER then
                         if gui.editing then
                             if touchState then
                                 selected = firstVisible + math.floor((touchState.y - y) / lh)
-                                print(string.format("EVT_VIRTUAL_ENTER --> selected: %d", selected))
                             end
 
                             gui.editing = false
                             self.selected = selected
                             callBack(self)
-                            --callBack(self, "final") --???
                         else
                             gui.editing = true
                             selected = self.selected
-                            --callBack(self, "temp") --???
                             adjustScroll()
                         end
                     elseif event == EVT_VIRTUAL_EXIT then
@@ -856,7 +861,6 @@ function M.newGUI()
         end
 
         local function onMenu(menu)
-            print("dropd/onMenu()")
             dismissMenu()
             callBack(self)
         end
@@ -886,14 +890,9 @@ function M.newGUI()
         local onMenu = self.onEvent
 
         function self.onEvent(event, touchState)
-            print(string.format("dropd/onEvent"))
-            --print(string.format("dropd/onEvent showingMenu: %d", showingMenu))
-
             if showingMenu then
-                print(string.format("dropd/onEvent/"))
                 onMenu(event, touchState)
             elseif event == EVT_VIRTUAL_ENTER then
-                print(string.format("dropd/onEvent/EVT_VIRTUAL_ENTER"))
                 -- Show drop down and let it take over while active
                 showingMenu = true
                 dropDown.onEvent(event)
@@ -912,7 +911,7 @@ function M.newGUI()
             end
         end
 
-         addElement(self, x, y, w, h)
+        addElement(self, x, y, w, h)
         return self
     end -- dropDown(...)
 
@@ -925,6 +924,8 @@ function M.newGUI()
             max = max,
             delta = delta,
             callBack = callBack or doNothing,
+            disabled = false,
+            hidden= false,
             editable = true
         }
 
@@ -995,6 +996,8 @@ function M.newGUI()
             max = max,
             delta = delta,
             callBack = callBack or doNothing,
+            disabled = false,
+            hidden= false,
             editable = true
         }
 
@@ -1061,7 +1064,7 @@ function M.newGUI()
     -- Create a custom element
     function gui.custom(self, x, y, w, h)
         self.gui = gui
-        self.lib = lib
+        self.lib = M
 
         function self.drawFocus(color)
             drawFocus(self.x or x, self.y or y, self.w or w, self.h or h, color)
@@ -1105,7 +1108,9 @@ function M.newGUI()
         return self
     end
 
+    -----------------------------------------------------------------------------------------------
     return gui
+
 end -- gui(...)
 
 return M

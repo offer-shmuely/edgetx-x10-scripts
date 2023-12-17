@@ -21,10 +21,10 @@ local M = {}
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2023
-local ver = "1.13"
+local app_ver = "1.14"
 
 function M.getVer()
-    return ver
+    return app_ver
 end
 
 --m_log = require("LogViewer/lib_log")
@@ -379,6 +379,7 @@ local function read_and_index_file_list()
             lcd.clear()
             lcd.drawFilledRectangle(0, 0, LCD_W, 20, TITLE_BGCOLOR)
             lcd.drawBitmap(img_bg2, 0, 0)
+            lcd.drawText(440, 1, "v" .. app_ver, WHITE + SMLSIZE)
 
             -- draw state
             lcd.drawText(5, 30, "Analyzing & indexing files", TEXT_COLOR + BOLD)
@@ -561,12 +562,14 @@ local function state_SELECT_INDEX_TYPE_init(event, touchState)
 
     ctx3.label(10, 30, 70, 24, "Indexing selection:", m_libgui.FONT_SIZES.FONT_8)
 
-    ctx3.button(90, 60, 320, 55, "All flights (slow)", onButtonIndexTypeAll)
+    ctx3.button(90,  60, 320, 55, "Only last flight (fast)", onButtonIndexTypeLastFlight)
     ctx3.button(90, 130, 320, 55, "Last flights day", onButtonIndexTypeToday)
-    ctx3.button(90, 200, 320, 55, "Only last flight (fast)", onButtonIndexTypeLastFlight)
+    ctx3.button(90, 200, 320, 55, "All flights (slow)", onButtonIndexTypeAll)
 
     -- default is ALL
-    index_type = INDEX_TYPE.ALL
+    --index_type = INDEX_TYPE.ALL
+    --index_type = INDEX_TYPE.TODAY
+    index_type = INDEX_TYPE.LAST
 
     log_file_list_raw = {}
 
@@ -1024,6 +1027,7 @@ local function drawMain()
         lcd.drawFilledRectangle(0, 0, LCD_W, 20, TITLE_BGCOLOR)
         lcd.drawBitmap(img_bg2, 0, 0)
     end
+    lcd.drawText(440, 1, "v" .. app_ver, WHITE + SMLSIZE)
 
     if state ~= STATE.SPLASH then
         img_bg1 = nil

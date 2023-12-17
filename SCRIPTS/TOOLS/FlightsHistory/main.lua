@@ -16,7 +16,7 @@
 -- This script display the flights history as kept using the "Flights" widget
 -- Author: Offer Shmuely
 -- Date: 2023
-local ver = "1.2"
+local app_ver = "1.3"
 
 -- to get help:
 -- change in lib_log.lua to "ENABLE_LOG_FILE=true"
@@ -88,10 +88,10 @@ local function validate_files()
     m_index_file = validate_script("lib_history_index", nil, m_log, app_name, m_utils, m_tables)
     if error_desc ~= nil then return end
 
-    m_libgui = validate_script("libgui", "1.0.2")
+    m_libgui = validate_script("libgui", "1.0.3")
     if error_desc ~= nil then return end
 
-    m_log_viewer3 = validate_script("FlightsHistory3", ver, m_log, m_utils,m_tables,m_index_file,m_libgui)
+    m_log_viewer3 = validate_script("FlightsHistory3", app_ver, m_log, m_utils,m_tables,m_index_file,m_libgui)
     if error_desc ~= nil then return end
 
 

@@ -1,4 +1,4 @@
--- TNS|LogViewer v1.13|TNE
+-- TNS|Log Viewer|TNE
 
 local function run()
     return "/SCRIPTS/TOOLS/LogViewer/main.lua"
