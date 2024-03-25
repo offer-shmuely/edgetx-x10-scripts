@@ -1,4 +1,4 @@
--- TNS|_Presets|TNE
+-- TNS|Presets|TNE
 
 local function run()
   return "/SCRIPTS/PRESETS/engine/main.lua"
