@@ -6,8 +6,8 @@ local supportedProtocols =
         push            = sportTelemetryPush,
         maxTxBufferSize = 6,
         maxRxBufferSize = 6,
-        saveMaxRetries  = 2,
-        saveTimeout     = 500,
+        maxRetries      = 3,
+        saveTimeout     = 5.0,
         cms             = {},
     },
     crsf =
@@ -17,8 +17,8 @@ local supportedProtocols =
         push            = crossfireTelemetryPush,
         maxTxBufferSize = 8,
         maxRxBufferSize = 58,
-        saveMaxRetries  = 2,
-        saveTimeout     = 150,
+        maxRetries      = 3,
+        saveTimeout     = 3.0,
         cms             = {},
     },
     ghst =
@@ -27,8 +27,8 @@ local supportedProtocols =
         push            = ghostTelemetryPush,
         maxTxBufferSize = 10, -- Tx -> Rx (Push)
         maxRxBufferSize = 6,  -- Rx -> Tx (Pop)
-        saveMaxRetries  = 2,
-        saveTimeout     = 250,
+        maxRetries      = 3,
+        saveTimeout     = 3.0,
         cms             = {},
     },
     simu =
@@ -37,8 +37,8 @@ local supportedProtocols =
         push            = ghostTelemetryPush,
         maxTxBufferSize = 10, -- Tx -> Rx (Push)
         maxRxBufferSize = 6,  -- Rx -> Tx (Pop)
-        saveMaxRetries  = 2,
-        saveTimeout     = 250,
+        maxRetries      = 3,
+        saveTimeout     = 3.0,
         cms             = {},
     }
 }
@@ -50,7 +50,7 @@ local function getProtocol()
         return supportedProtocols.crsf
     elseif supportedProtocols.ghst.push() ~= nil then
         return supportedProtocols.ghst
-    elseif runningInSimulator ~= nil then
+    elseif rf2.runningInSimulator ~= nil then
         return supportedProtocols.simu
     end
 end
