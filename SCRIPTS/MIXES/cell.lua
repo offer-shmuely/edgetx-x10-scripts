@@ -67,12 +67,10 @@ local function run(batt_total_voltage, cell_count, lithium_ion, idx)
     local base_sens_id = idx *2
     setTelemetryValue(0x0310 + idx, 0, 1, cell_v * 100, 1, 2, name_cell)
     setTelemetryValue(0x0310+idx, 1, 1, cell_count, 0, 0, name_cell_count)
-    --setTelemetryValue(0x0310+idx, 2, 1, cell_percent, 13, 0, "cel%")
 
-    -- return cell_v, math.ceil(cell_percent * 1.024), cell_count, batt_total_voltage
+    -- return cell_v, math.ceil(cell_v * 1.024), cell_count, batt_total_voltage
     -- return cell_v, cell_count, batt_total_voltage
     return 0
 end
 
---return { input = _inputs, output = _outputs, init = init, run = run }
 return { input = _inputs, run = run }
