@@ -2,7 +2,7 @@ local allow_touch_app = ...
 -- to disable touch app, and use the command line version. set to false
 -- allow_touch_app = false
 
-local LUA_VERSION = "2.1.1"
+local LUA_VERSION = "2.1.1-dev.9"
 
 chdir("/SCRIPTS/RF2_touch")
 

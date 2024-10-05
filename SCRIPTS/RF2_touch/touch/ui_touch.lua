@@ -304,7 +304,7 @@ local function buildMainMenu()
                 change_state_to_pages()
             end
         })
-        log("mainMenuBuild: i=%s, col=%s, x=%s, y=%s, w=%s, h=%s", i, col, x, y, w, h)
+        log("mainMenuBuild: i=%s, col=%s, x=%s, y=%s, w=%s, h=%s (%s)", i, col, x, y, w, h, PageFiles[i].t2)
     end
 
 end
@@ -522,8 +522,8 @@ local function buildFieldsPage()
             log("number_as_button: i=%s, txt=%s, min:%s,max:%s,scale:%s, mult:%s, steps=%s, raw-val: %s", i, txt, f.min, f.max, f.scale, f.mult, (1/(f.scale or 1))*(f.mult or 1), f.value)
             libGUI.newControl.ctl_rf2_button_number(panelFieldsPage, txt, {
                 x=x_Temp, y=y, w=150, h=h_btn,
-                min=f.min/(f.scale or 1),
-                max=f.max/(f.scale or 1),
+                min=f.min and f.min/(f.scale or 1),
+                max=f.max and f.max/(f.scale or 1),
                 steps=(1/(f.scale or 1))*(f.mult or 1),
                 value=f.value,
                 units=units,
