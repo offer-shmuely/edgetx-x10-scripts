@@ -67,7 +67,7 @@ function M.getFileDataInfo(fileName)
 
     -- stop after 2M (1000x2028)
     local sample_col_data = nil
-    for i = 1, 50000 do
+    for i = 1, 1000 do
         --M.m_log.info("profiler: start")
         --local t1 =getTime()
         local data2 = io.read(hFile, 2048)
