@@ -94,30 +94,27 @@ local function getSignalValues()
     if fieldinfo then
         local v = getValue("RSSI")
         log("RSSI: " .. v)
-        lcd.drawText(3, 30, "Using signal: Frsky RSSI", 0)
-        return v, 0, 100
+        return v, 0, 100, "Using signal: Frsky RSSI", nil
     end
 
     -- try expressLRS antenna 1
     local fieldinfo = getFieldInfo("1RSS")
     if fieldinfo then
         local v = getValue("1RSS")
-        lcd.drawText(3, 30, "Using signal: elrs 1RSS", 0)
         if v == 0 then
             v = -115
         end
-        return v, -115, 20
+        return v, -115, 20, "Using signal: elrs 1RSS", "Set tx power to 25mW non dynamic"
     end
 
     -- try expressLRS antenna 2
     local fieldinfo = getFieldInfo("2RSS")
     if fieldinfo then
         local v = getValue("2RSS")
-        lcd.drawText(3, 30, "Using signal: elrs 2RSS", 0)
         if v == 0 then
             v = -115
         end
-        return v, -115, 20
+        return v, -115, 20, "Using signal: elrs 2RSS", "Set tx power to 25mW non dynamic"
     end
 
     ---- try UNI-ACSST firmware VFR
@@ -147,27 +144,32 @@ local function main(event, touchState)
     lcd.drawBitmap(img, LCD_W-120, 30, 20)
 
     -- Title
-    lcd.drawText(3, 3, "RSSI Model Locator", 0)
-    lcd.drawText(LCD_W - 50, 3, "ver: " .. app_ver .. "", SMLSIZE)
+    lcd.drawFilledRectangle(0,0, LCD_W, 30, BLACK)
+    lcd.drawFilledRectangle(0,LCD_H-25, LCD_W, 25, GREY)
+    lcd.drawText(10, 3, "RSSI Model Locator", WHITE)
+    lcd.drawText(LCD_W - 50, 3, "ver: " .. app_ver .. "", SMLSIZE + GREEN)
 
-    local signalValue, signalMin, signalMax = getSignalValues()
+    local signalValue, signalMin, signalMax, line1, line2 = getSignalValues()
     -- log(signalValue)
     if signalValue == nil then
         lcd.drawText(30, 50, "No signal found (expected: RSSI/1RSS/2RSS)", 0 + BLINK)
         return 0
     end
+    lcd.drawText(3, 60, line2 or "", RED)
+    lcd.drawText(10, LCD_H-22, line1, WHITE)
+
     log("signalValue:" .. signalValue .. ", signalMin: " .. signalMin .. ", signalMax: " .. signalMax)
 
     local signalPercent = 100 * ((signalValue - signalMin) / (signalMax - signalMin))
     lcd.setColor(CUSTOM_COLOR, getRangeColor(signalPercent, 0, 100))
 
     -- draw current value
-    lcd.drawNumber(180, 30, signalValue, XXLSIZE + CUSTOM_COLOR)
-    lcd.drawText(260, 70, "db", 0 + CUSTOM_COLOR)
+    lcd.drawNumber(40, 100, signalValue, XXLSIZE + CUSTOM_COLOR)
+    lcd.drawText(130, 140, "db", 0 + CUSTOM_COLOR)
 
     -- draw main bar
-    local xMin = 0
-    local yMin = LCD_H - 10
+    local xMin = 10
+    local yMin = LCD_H - 30
     local xMax = LCD_W
     local h = 0
     local rssiAsX = (signalPercent * xMax) / 100
