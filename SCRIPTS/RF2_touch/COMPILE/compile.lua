@@ -9,11 +9,15 @@ local function compile()
     local script = scripts(i)
     i = i + 1
     if script then
+        if string.sub(script, 1, 13) == "/SCRIPTS/RF2/" then
+            script = "/SCRIPTS/RF2_touch/" .. string.sub(script, 14)
+        end
+
         if script == "/SCRIPTS/RF2_touch/ui.lua" then return 0 end
         lcd.clear()
         lcd.drawText(2, 2, "Compiling...", SMLSIZE)
         lcd.drawText(2, 22, script, SMLSIZE)
-        assert(loadScript(script, 'c'))
+        assert(loadScript(script, 'tcd'))
         collectgarbage()
         return 0
     end

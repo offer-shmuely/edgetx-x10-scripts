@@ -27,7 +27,7 @@ function M.buildSpecialFields(libGUI, panel,Page,  y, runningInSimulator, update
     libGUI.newControl.ctl_title(panel, nil, {x=0, y=y+3*row_h, w=col1_w, h=row_h, bg_color=ORANGE, text1_x=10, text1="COLLECTIVE"})
 
     -- values
-    local defaults = { 120, 120, 50, 9.5, 360, 360, 400, 12, 0, 0, 0, 0 }
+    -- local defaults = { 120, 120, 50, 9.5, 360, 360, 400, 12, 0, 0, 0, 0 }
     for col=1, 3 do
         for row=1, 4 do
             local x = col1_w+1+(col-1)*(col_w2)
@@ -35,7 +35,9 @@ function M.buildSpecialFields(libGUI, panel,Page,  y, runningInSimulator, update
             local i = (col-1)*4 + row
             local f = Page.fields[i]
             if runningInSimulator and f.label == nil then
-                f.value = defaults[i]
+                -- f.value = defaults[i]
+                f.value = Page.simulatorResponse[i]
+
             end
 
             libGUI.newControl.ctl_rf2_button_number(panel,  "rates-"..col.."-"..row, {

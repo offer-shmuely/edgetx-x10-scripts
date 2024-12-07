@@ -16,7 +16,7 @@ function ctl_rf2_button_menu(panel, id, args, flags)
         h = args.h,
         bgColor = args.bgColor or panel.colors.btn.bg,
         title_txt = args.title_txt or nil,
-        img = Bitmap.open("IMAGES/" .. (args.img or "na.png")),
+        img = bitmap.open("IMAGES/" .. (args.img or "na.png")),
     }
     panel.log("mainMenuBuild: i=%s, x=%s, y=%s, w=%s, h=%s", id, self.x, self.y, self.w, self.h)
 

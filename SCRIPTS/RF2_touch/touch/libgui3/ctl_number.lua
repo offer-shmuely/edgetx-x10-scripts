@@ -95,8 +95,10 @@ function number(panel, id, args, flags)
             if event == EVT_VIRTUAL_ENTER then
                 killEvents(event)   -- X10/T16 issue: pageUp is a long press
                 self.modalPanel = panel.newPanel("modal-fancy-editor")
-                self.ctlNumberEditing = self.modalPanel.newControl.ctl_number_editor(self.modalPanel, "numEditor1", {
-                    value=self.value,min=self.min,max=self.max,
+                -- self.ctlNumberEditing = self.modalPanel.newControl.ctl_number_editor_mt(
+                self.ctlNumberEditing = self.modalPanel.newControl.ctl_number_editor_btn(
+                        self.modalPanel, "numEditor1", {
+                        value=self.value,min=self.min,max=self.max,
                     text=self.text,
                     help=self.help,
                         onCancel=function()

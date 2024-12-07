@@ -55,12 +55,13 @@ local function onReceivedPilotConfig(page, config)
     pilotConfig = config
     setValues()
     collectgarbage()
+    rf2.lcdNeedsInvalidate = true
     page.isReady = true
 end
 
 local function pilotConfigReset()
     -- Reset FM8-GV8, see background.lua
-    model.setGlobalVariable(8, 7, 0)
+    model.setGlobalVariable(7, 8, 0)
 end
 
 return {

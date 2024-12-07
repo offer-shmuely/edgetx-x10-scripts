@@ -46,6 +46,7 @@ M.libgui_dir = libgui_dir
 M.newControl = {}
 M.prompt = nil
 M.showingPrompt = false
+M.load_script_flags = "tcd"
 
 -- Show prompt
 function M.showPrompt(prompt)
@@ -79,7 +80,7 @@ for ctl_name in dir(libgui_dir) do
     local file_name_short = string.match(ctl_name, "^(ctl_.+).lua$")
     if file_name_short ~= nil then
         M.log("loadControl(%s)", ctl_name)
-        M.newControl[file_name_short] = assert(loadScript(M.libgui_dir .. "/" .. ctl_name, "tcd"))()
+        M.newControl[file_name_short] = assert(loadScript(M.libgui_dir .. "/" .. ctl_name, M.load_script_flags))()
         M.log("ctl_file: %s, flie_name_short: %s", ctl_name, file_name_short)
     end
 end
@@ -404,6 +405,11 @@ function M.newPanel(id, args)
             end
             count = count + 1
         until not (panel._.elements[panel._.focus].disabled or panel._.elements[panel._.focus].editable==false or panel._.elements[panel._.focus].hidden) or count > #panel._.elements
+    end
+
+    -- move focus to specific element
+    function panel.moveFocusAbsolute(newPos)
+        panel._.focus = newPos
     end
 
     -- Moved the focused element

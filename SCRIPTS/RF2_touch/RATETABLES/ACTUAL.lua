@@ -1,5 +1,5 @@
 return {
-    labels = { "", "", "Roll", "Pitch", "Yaw", "Coll", (LCD_W < 320) and "Centr" or "Center", "Sens", "Max", "Rate", "", "Expo" },
+    labels = { "", "", "Roll", "Pitch", "Yaw", "Coll", (LCD_W < 320) and "Centr" or "Center", "Rate", "Max", "Rate", "", "Expo" },
     fields = {
         { min = 1, max = 200, scale = 0.1 },
         { min = 1, max = 200, scale = 0.1 },

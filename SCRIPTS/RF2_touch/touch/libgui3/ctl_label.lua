@@ -4,6 +4,7 @@
 -- not yet: align_w=LEFT/CENTER/RIGHT, align_vert=TOP|CENTER|BUTTOM, text
 
 function label(panel, id, args, flags)
+    -- panel.log("label: ", id)
     assert(args)
     assert(args.text)
         local self = {

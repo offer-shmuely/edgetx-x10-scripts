@@ -74,7 +74,6 @@ function ctl_rf2_button_number(panel, id, args, flags)
     function self.draw(focused)
         local x,y,w,h = self.x,self.y,self.w,self.h
         -- panel.log("[%s] number_as_button:draw(%s)", self.id, self.text)
-        -- panel.log("ctl_number_editor.draw(%s) - isEditorOpen:%s", self.text, self.isEditorOpen)
 
         drawButton()
 
@@ -97,7 +96,8 @@ function ctl_rf2_button_number(panel, id, args, flags)
         panel.log("[%s] number_as_button::66, f(%s)", self.id, args.aaa)
 
         self.modalPanel = panel.newPanel("modal-fancy-editor")
-        self.ctlNumberEditing = self.modalPanel.newControl.ctl_number_editor(self.modalPanel, "numEditor1", {
+        -- self.ctlNumberEditing = self.modalPanel.newControl.ctl_number_editor_mt(self.modalPanel, "numEditor1", {
+        self.ctlNumberEditing = self.modalPanel.newControl.ctl_number_editor_btn(self.modalPanel, "numEditor1", {
             steps=self.steps,
             value=self.value,min=self.min,max=self.max,
             initiatedValue=self.initiatedValue,

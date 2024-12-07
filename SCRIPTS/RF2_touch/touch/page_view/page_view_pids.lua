@@ -26,7 +26,7 @@ function M.buildSpecialFields(libGUI, panel,Page,  y, runningInSimulator, update
     local last_y = y
 
     -- values
-    local defaults = { 120,100,90, 150,150,150, 80,120,10, 60,70,0,     1,2,3,   4, 5, 6}
+    -- local defaults = { 120,100,90, 150,150,150, 80,120,10, 60,70,0,     1,2,3,   4, 5, 6}
     for col=1, 4 do
         for row=1, 3 do
             local x1 = col1_w+1+(col-1)*(col_w2)
@@ -35,7 +35,8 @@ function M.buildSpecialFields(libGUI, panel,Page,  y, runningInSimulator, update
             local f = Page.fields[i]
             -- if runningInSimulator and f.value == nil and f.label == nil then
             if runningInSimulator and f.label == nil then
-                f.value = defaults[i]
+                -- f.value = defaults[i]
+                f.value = Page.simulatorResponse[i]
             end
 
             libGUI.newControl.ctl_rf2_button_number(panel, "butnum-pid"..col.."-"..row, {

@@ -49,8 +49,9 @@ local function log(fmt, ...)
 end
 
 local libgui_dir = "/SCRIPTS/" .. app_name .. "/touch/libgui3"
-local libGUI = assert(rf2.loadScript("touch/libgui3/libgui3.lua", "tcd"))(libgui_dir)
-local ctl_fieldsInfo = assert(rf2.loadScript("touch/fields_info.lua", "tcd"))()
+local libGUI = assert(rf2.loadScript("touch/libgui3/libgui3.lua"))(libgui_dir)
+libGUI.load_script_flags = "c"
+local ctl_fieldsInfo = assert(rf2.loadScript("touch/fields_info.lua"))()
 local img_bg1 = nil
 local splash_start_time = 0
 local btnReload
@@ -164,54 +165,6 @@ rf2.dataBindFields = function()
     end
 end
 
-local function simFillValues()
-    for i=1,#Page.fields do
-        local f = Page.fields[i]
-        if f.vals then
-            local val
-            if f.table ~= nil then
-                val = #f.table-1
-            else
-                val = math.floor((f.max + f.min) / (f.scale or 1) * 0.2)
-            end
-            f.value = val
-        end
-    end
-end
-
-local function processMspReply(cmd,rx_buf,err)
-    if not Page or not rx_buf then
-        --
-    elseif cmd == Page.write then
-        if Page.eepromWrite then
-            eepromWrite()
-        else
-            invalidatePages()
-        end
-        libGUI.dismissPrompt()
-        modalWatingPanel = nil
-        invalidatePages()
-
-    elseif cmd == uiMsp.eepromWrite then
-        if Page.reboot then
-            rebootFc()
-        end
-        invalidatePages()
-    elseif cmd == Page.read and err then
-        Page.fields = { { x = 6, y = rf2.radio.yMinLimit, value = "", ro = true } }
-        Page.labels = { { x = 6, y = rf2.radio.yMinLimit, t = "N/A" } }
-    elseif cmd == Page.read and #rx_buf > 0 then
-        Page.values = rx_buf
-        if Page.postRead then
-            Page.postRead(Page)
-        end
-        dataBindFields()
-        if Page.postLoad then
-            Page.postLoad(Page)
-        end
-    end
-end
-
 -- ---------------------------------------------------------------------
 local mspLoadSettings =
 {
@@ -229,6 +182,8 @@ local mspLoadSettings =
 }
 
 rf2.readPage = function()
+    collectgarbage()
+
     if type(Page.read) == "function" then
         Page.read(Page)
     else
@@ -278,7 +233,7 @@ local function buildMainMenu()
 
     libGUI.newControl.ctl_title(panelMainMenu, nil, {
         x=0,y=0,w=LCD_W,h=30,
-        text1="Rotorflight " .. LUA_VERSION,
+        text1="Rotorflight2 Touch - " .. LUA_VERSION,
         text1_x=10, bg_color=panelMainMenu.colors.topbar.bg
     })
 
@@ -422,6 +377,9 @@ local function buildFieldsPage()
     })
     -- btnSave.disabled = true
 
+    -- skip the release & save buttons
+    panelFieldsPage.moveFocusAbsolute(#(panelFieldsPage._.elements)) -- (3)
+
     log("currentPageName: %s", currentPageName)
     if currentPageName == "Rates" then
         log("currentPageName: %s == rate", currentPageName)
@@ -432,7 +390,7 @@ local function buildFieldsPage()
 
     local pageName = string.gsub(PageFiles[currentPage].script, "%.lua$", "")
     local viewFileName = "touch/page_view/page_view_" .. pageName .. ".lua"
-    local vChunk = rf2.loadScript(viewFileName, "tcd")
+    local vChunk = rf2.loadScript(viewFileName)
     if vChunk then
         log("found: %s", viewFileName)
         local rateTouchView = vChunk(libgui_dir)
@@ -441,9 +399,9 @@ local function buildFieldsPage()
 
     -- genric display for all pages
     for i=firstRegularField ,#Page.fields do
-        -- log("fieldsPageBuild: %s. --", i)
+        -- log("buildFieldsPage: %s. --", i)
         local f = Page.fields[i]
-        log("fieldsPageBuild: %s. t: [%s]", i, f.t or "NA")
+        log("buildFieldsPage: %s. t: [%s]", i, f.t or "NA")
 
         local txt = f.t2 or f.t or "---"
 
@@ -453,7 +411,7 @@ local function buildFieldsPage()
         if f.id ~= nil then
             if ctl_fieldsInfo[f.id] then
                 units = ctl_fieldsInfo[f.id].units
-                log("fieldsPageBuild: i=%s, units: %s", i, units)
+                log("buildFieldsPage: i=%s, units: %s", i, units)
                 if not units then
                     units = ""
                 end
@@ -485,21 +443,29 @@ local function buildFieldsPage()
             y = y + lineSpacingLabel
             last_y = y
             col_id = 0
+        elseif f.readOnly == true then
+                col_id = 0
+                y = last_y
+                libGUI.newControl.ctl_label(panelFieldsPage, nil, {x=x, y=y, w=val_w, h=h, text=txt})
+                y = y + lineSpacingLabel
+                last_y = y
+                col_id = 0
 
-        elseif f.table ~= nil then
+        elseif f.table ~= nil or (f.data ~= nil and f.data.table ~= nil) then
             col_id = 0
             y = last_y
+            local theItems = f.table or f.data.table
             libGUI.newControl.ctl_label(panelFieldsPage, nil, {x=x, y=y, w=0, h=h, text=txt})
-            log("fieldsPageBuild: i=%s, table0: %s, table1: %s (total: %s)", i, f.table[0], f.table[1], #f.table)
+            log("buildFieldsPage: i=%s, table0: %s, table1: %s (total: %s)", i, theItems[0], theItems[1], #theItems)
             libGUI.newControl.ctl_dropdown(panelFieldsPage, nil,
-                {x=val_x, y=y, w=val_w, h=h, items=f.table, selected=f.value,
+                {x=val_x, y=y, w=val_w, h=h, items=theItems, selected=f.value,
                     callback=function(ctl)
                         if f.postEdit then
                             f.postEdit(Page)
                         end
                         local selected1 = ctl.getSelected()
                         local selected0or1based = panelFieldsPage._.tableBasedX_convertSelectedTo0or1Based(selected1, ctl.items0or1)
-                        -- log("fieldsPageBuild222: i=%s, selected1: %s, selected0or1based: %s", i, selected1, selected0or1based)
+                        -- log("buildFieldsPage222: i=%s, selected1: %s, selected0or1based: %s", i, selected1, selected0or1based)
                         updateValueChange(i, selected0or1based)
                     end
                 } )
@@ -547,7 +513,7 @@ local function buildFieldsPage()
 
         end
 
-        log("fieldsPageBuild: i=%s, col=%s, y=%s, text: %s", i, col, y, txt2)
+        log("buildFieldsPage: i=%s, col=%s, y=%s, text: %s", i, col, y, txt2)
     end
 
     -- -- footer
@@ -606,6 +572,14 @@ local function run_ui_spalsh(event, touchState)
 
 end
 
+rf2.loadPageFiles = function(setCurrentPageToLastPage)
+    PageFiles = assert(rf2.loadScript("pages.lua"))()
+    if setCurrentPageToLastPage then
+        currentPage = #PageFiles
+    end
+    collectgarbage()
+end
+
 local function run_ui_init(event, touchState)
     img_bg1 = nil
     lcd.clear()
@@ -622,7 +596,7 @@ local function run_ui_init(event, touchState)
         return 0
     end
     init = nil
-    PageFiles = assert(rf2.loadScript("pages.lua"))()
+    rf2.loadPageFiles()
     invalidatePages()
     buildMainMenu()
     uiState = prevUiState or uiStatus.mainMenu
@@ -650,11 +624,13 @@ local function run_ui_pages(event, touchState)
     lcd.clear()
 
     if not Page then
+        collectgarbage()
         Page = assert(rf2.loadScript("PAGES/"..PageFiles[currentPage].script))()
         collectgarbage()
     end
 
-    if not Page.values and pageState == pageStatus.display then
+    if not(Page.values or Page.isReady) and pageState == pageStatus.display then
+    -- if not Page.values and pageState == pageStatus.display then
         requestPage()
     end
 
@@ -729,10 +705,6 @@ local function run_ui(event, touchState)
     --     lcd.drawText(rf2.radio.NoTelem[1],rf2.radio.NoTelem[2],rf2.radio.NoTelem[3],rf2.radio.NoTelem[4])
     -- end
 
-    -- mspProcessTxQ()
-    -- processMspReply(mspPollReply())
-
-
     rf2.mspQueue:processQueue()
 
 
@@ -740,7 +712,7 @@ local function run_ui(event, touchState)
     if panelFieldsPage==nil then
         if rf2.runningInSimulator then
             if (Page) then
-                simFillValues()
+                -- simFillValues()
                 buildFieldsPage()
             end
         else
