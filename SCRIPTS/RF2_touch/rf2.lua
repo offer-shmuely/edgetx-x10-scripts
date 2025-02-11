@@ -1,25 +1,33 @@
 rf2 = {
     baseDir = "/SCRIPTS/RF2/",
     runningInSimulator = string.sub(select(2,getVersion()), -4) == "simu",
+    serial_debug = false,
 
     loadScript = loadScript,
 
-    log = function(str)
+    log_to_file = function(str)
         if not rf2.logfile then
             rf2.logfile = io.open("/LOGS/rf2.log", "a")
         end
-        io.write(rf2.logfile, string.format("%.2f ", rf2.clock()) .. tostring(str) .. "\n")
+        -- write only if LOGS dir exist (diferent from LOG)
+        if rf2.logfile then
+            io.write(rf2.logfile, string.format("%.2f ", rf2.clock()) .. tostring(str) .. "\n")
+        end
     end,
 
     print = function(fmt, ...)
+        local str = string.format("[rf2] " .. fmt, ...)
         if rf2.runningInSimulator then
-            str = string.format("[rf2] " .. fmt, ...)
-            print(tostring(str))
+            print(str)
+            -- rf2.log_to_file(str)
+        elseif rf2.serial_debug==true then
+            serialWrite(str.."\r\n") -- 115200 bps
         else
-            -- str = string.format("[rf2] " .. fmt, ...)
-            --serialWrite(tostring(str).."\r\n") -- 115200 bps
-            --rf2.log(str)
+            -- rf2.log_to_file(str)
         end
+    end,
+    log = function(fmt, ...)
+        rf2.print(fmt, ...)
     end,
 
     clock = function()

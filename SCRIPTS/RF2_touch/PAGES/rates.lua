@@ -77,10 +77,10 @@ x = margin
 inc.y(lineSpacing * 0.5)
 fields[13] = { t = "Rates type",                   x = x,          y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 5,      vals = { 1 }, table = { [0] = "NONE", "BETAFL", "RACEFL", "KISS", "ACTUAL", "QUICK"}, postEdit = function(self, page) page.updateRatesType(page, true) end }
 
--- inc.y(lineSpacing * 0.5)
--- fields[14] = { t = "Current rate profile",         x = x,          y = inc.y(lineSpacing), sp = x + sp * 1.17, data = { value = nil, min = 0, max = 5, table = { [0] = "1", "2", "3", "4", "5", "6" } }, preEdit = startEditing, postEdit = endRateEditing }
--- fields[15] = { t = "Destination profile",          x = x,          y = inc.y(lineSpacing), sp = x + sp * 1.17, data = { value = nil, min = 0, max = 5, table = { [0] = "1", "2", "3", "4", "5", "6" } } }
--- fields[#fields + 1] = { t = "[Copy Current to Dest]", x = x + indent, y = inc.y(lineSpacing), preEdit = copyProfile }
+inc.y(lineSpacing * 0.5)
+fields[14] = { t = "Current rate profile",         x = x,          y = inc.y(lineSpacing), sp = x + sp * 1.17, data = { value = nil, min = 0, max = 5, table = { [0] = "1", "2", "3", "4", "5", "6" } }, preEdit = startEditing, postEdit = endRateEditing }
+fields[15] = { t = "Destination profile",          x = x,          y = inc.y(lineSpacing), sp = x + sp * 1.17, data = { value = nil, min = 0, max = 5, table = { [0] = "1", "2", "3", "4", "5", "6" } } }
+fields[#fields + 1] = { t = "[Copy Current to Dest]", x = x + indent, y = inc.y(lineSpacing), preEdit = copyProfile }
 
 inc.y(lineSpacing * 0.5)
 labels[#labels + 1] = { t = "Roll Dynamics",       x = x,          y = inc.y(lineSpacing) }
@@ -163,21 +163,21 @@ return {
     end,
 
     onProcessedMspStatus = function(self, status)
-        -- local currentField = self.fields[14]
-        -- if currentField.data.value ~= status.rateProfile and not editing then
-        --     if currentField.data.value then
-        --         profileAdjustmentTS = rf2.clock()
-        --     end
-        --     currentField.data.value = status.rateProfile
-        -- end
-        -- local destField = self.fields[15]
-        -- if not destField.data.value then
-        --     if status.rateProfile < 5 then
-        --         destField.data.value = status.rateProfile + 1
-        --     else
-        --         destField.data.value = 4
-        --     end
-        -- end
+        local currentField = self.fields[14]
+        if currentField.data.value ~= status.rateProfile and not editing then
+            if currentField.data.value then
+                profileAdjustmentTS = rf2.clock()
+            end
+            currentField.data.value = status.rateProfile
+        end
+        local destField = self.fields[15]
+        if not destField.data.value then
+            if status.rateProfile < 5 then
+                destField.data.value = status.rateProfile + 1
+            else
+                destField.data.value = 4
+            end
+        end
         rf2.lcdNeedsInvalidate = true
         self.isReady = true
     end,

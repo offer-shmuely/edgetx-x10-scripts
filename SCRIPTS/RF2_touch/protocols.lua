@@ -26,27 +26,16 @@ local supportedProtocols =
         maxRxBufferSize = 6,  -- Rx -> Tx (Pop)
         maxRetries      = 3,
         saveTimeout     = 4.0,
-    },
-    simu =
-    {
-        mspTransport    = "MSP/simu.lua",
-        push            = ghostTelemetryPush,
-        maxTxBufferSize = 10, -- Tx -> Rx (Push)
-        maxRxBufferSize = 6,  -- Rx -> Tx (Pop)
-        maxRetries      = 3,
-        saveTimeout     = 3.0,
     }
 }
 
 local function getProtocol()
     if supportedProtocols.smartPort.push() ~= nil then
         return supportedProtocols.smartPort
-    elseif supportedProtocols.crsf.push() ~= nil then
+    elseif supportedProtocols.crsf.push() ~= nil or rf2.runningInSimulator then
         return supportedProtocols.crsf
     elseif supportedProtocols.ghst.push() ~= nil then
         return supportedProtocols.ghst
-    elseif rf2.runningInSimulator ~= nil then
-        return supportedProtocols.simu
     end
 end
 

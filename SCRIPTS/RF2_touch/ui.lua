@@ -305,8 +305,8 @@ local function drawScreen()
             lcd.drawText(f.x, y, f.t2 or f.t, textOptions)
         end
     end
-    local val = "---"
     for i=1,#Page.fields do
+        local val = "---"
         local f = Page.fields[i]
         local valueOptions = textOptions
         if i == currentField then

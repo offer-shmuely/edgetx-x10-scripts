@@ -2,7 +2,7 @@ local allow_touch_app = ...
 -- to disable touch app, and use the command line version. set to false
 -- allow_touch_app = false
 
-local LUA_VERSION = "2.1.14"
+local LUA_VERSION = "2.1.15"
 
 chdir("/SCRIPTS/RF2_touch")
 
@@ -25,11 +25,14 @@ local run = nil
 local scriptsCompiled = assert(loadScript("COMPILE/scripts_compiled.lua"))()
 
 local stick_ail_val = getValue('ail')
-local stick_ail_ele = getValue('ele')
-local force_recompile = (math.abs(stick_ail_val) > 1000) and (math.abs(stick_ail_ele) > 1000)
+local stick_ele_val = getValue('ele')
+local force_recompile = (stick_ail_val > 1000) and (stick_ele_val >  1000)
+local serial_debug    = (stick_ail_val > 1000) and (stick_ele_val < -1000)
+-- serial_debug = true --???
 
 if scriptsCompiled and force_recompile==false then
     assert(loadScript("rf2.lua"))()
+    rf2.serial_debug = serial_debug
     rf2.protocol = assert(rf2.loadScript("protocols.lua"))()
     rf2.radio = assert(rf2.loadScript("radios.lua"))().msp
     rf2.mspQueue = assert(rf2.loadScript("MSP/mspQueue.lua"))()

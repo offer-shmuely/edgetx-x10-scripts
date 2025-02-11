@@ -16,10 +16,26 @@ PageFiles[#PageFiles + 1] = { title = "Accelerometer Trim", t2 = "Trim Acc",    
 --PageFiles[#PageFiles + 1] = { title = "Copy profiles",      t2 = "Copy Prof",           per_profile=false, script = "copy_profiles.lua",     img="copy.png" }
 
 if rf2.apiVersion >= 12.07 then
-    PageFiles[#PageFiles + 1] = { title = "Model on TX",    t2 = "Model on TX",         per_profile=false, script = "model.lua" }
-    -- PageFiles[#PageFiles + 1] = { title = "ESC - HW Platinum V5",       t2 = "ESC-HW P V5",    per_profile=false, script = "esc_hwpl5.lua" }
-    -- PageFiles[#PageFiles + 1] = { title = "ESC - Scorpion Tribunus",    t2 = "ESC-Scorpion", per_profile=false, script = "esc_scorp.lua" }
-    -- PageFiles[#PageFiles + 1] = { title = "ESC - YGE",                  t2 = "ESC-YGE",               per_profile=false, script = "esc_yge.lua" }
+    if settings.showModelOnTx == 1 then
+        PageFiles[#PageFiles + 1] = { title = "Model on TX", script = "model.lua" }
+    end
+    if settings.showExperimental == 1 then
+        PageFiles[#PageFiles + 1] = { title = "Experimental (danger!)", script = "experimental.lua" }
+    end
+    if settings.showFlyRotor == 1 then
+        PageFiles[#PageFiles + 1] = { title = "ESC - FlyRotor", script = "esc_flyrotor.lua" }
+    end
+    if settings.showPlatinumV5 == 1 then
+        PageFiles[#PageFiles + 1] = { title = "ESC - HW Platinum V5",       t2 = "ESC-HW P V5",    per_profile=false, script = "esc_hwpl5.lua" }
+    end
+    if settings.showTribunus == 1 then
+        PageFiles[#PageFiles + 1] = { title = "ESC - Scorpion Tribunus",    t2 = "ESC-Scorpion", per_profile=false, script = "esc_scorp.lua" }
+    end
+    if settings.showYge == 1 then
+        PageFiles[#PageFiles + 1] = { title = "ESC - YGE",                  t2 = "ESC-YGE",               per_profile=false, script = "esc_yge.lua" }
+    end
+
+    PageFiles[#PageFiles + 1] = { title = "Settings", t2 = "Settings", script = "settings.lua", img="settings.png"  }
 end
 
 return PageFiles

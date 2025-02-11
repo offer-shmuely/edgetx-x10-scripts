@@ -34,7 +34,7 @@ local killEnterBreak = 0
 local pageScrollY = 0
 local mainMenuScrollY = 0
 local PageFiles, Page, init
-local img_title_menu = Bitmap.open("images/title_menu.png")
+local img_title_menu = Bitmap.open("touch/images/title_menu.png")
 
 local backgroundFill = TEXT_BGCOLOR or ERASE
 local foregroundColor = LINE_COLOR or SOLID
@@ -65,6 +65,19 @@ local panelMainMenu = libGUI.newPanel("mainMenu", {enable_page_scroll=true})
 local panelFieldsPage = nil
 local modalWatingPanel = nil
 local modalWatingCtl = nil
+
+local _tilteCtl
+local _title_prefix = ""
+local mspStatus = assert(rf2.loadScript("MSP/mspStatus.lua"))()
+local _statusTimer_LastTimeFired = nil
+local _fcStatus = {
+    armingDisableFlagsString = "",
+    armingDisableFlags = 0,
+    profile = 0,
+    rateProfile = 0,
+    realTimeLoad = 0,
+    cpuLoad = 0,
+}
 
 -- -------------------------------------------------------------------
 local modalWatingParams = nil
@@ -166,18 +179,25 @@ rf2.dataBindFields = function()
 end
 
 -- ---------------------------------------------------------------------
+-- old msp handling
 local mspLoadSettings =
 {
     processReply = function(self, buf)
+        if not Page then return end -- could happen if one returns to the main menu before processReply
         rf2.print("Page is processing reply for cmd "..tostring(self.command).." len buf: "..#buf.." expected: "..Page.minBytes)
         Page.values = buf
         if Page.postRead then
-            Page.postRead(Page)
+            if Page.postRead(Page) == -1 then
+                Page.values = nil
+                return
+             end
         end
         rf2.dataBindFields()
         if Page.postLoad then
             Page.postLoad(Page)
         end
+
+        Page.isReady = true
     end
 }
 
@@ -185,8 +205,10 @@ rf2.readPage = function()
     collectgarbage()
 
     if type(Page.read) == "function" then
+        log("readPage: new way [%s]", Page.title)
         Page.read(Page)
     else
+        log("readPage: old way [%s]", Page.title)
         mspLoadSettings.command = Page.read
         mspLoadSettings.simulatorResponse = Page.simulatorResponse
         rf2.mspQueue:add(mspLoadSettings)
@@ -195,14 +217,13 @@ end
 
 local function requestPage()
     if not Page.reqTS or Page.reqTS + 2 <= rf2.clock() then
-        --rf2.print("Requesting page...")
-        Page.reqTS = rf2.clock()
+        log("Requesting page... (%s)", Page.title)
+        -- Page.reqTS = rf2.clock()
         if Page.read then
             rf2.readPage()
         end
     end
 end
-
 
 local function change_state_to_menu()
     invalidatePages()
@@ -218,6 +239,11 @@ local function change_state_to_pages()
     Page = nil
 end
 
+local function refreshTitle()
+    if _tilteCtl then
+        _tilteCtl.text1 = string.format("%s (Bank: %s Rate: %s)",_title_prefix, _fcStatus.profile+1, _fcStatus.rateProfile+1)
+    end
+end
 
 -- draw menu (pages)
 local function buildMainMenu()
@@ -231,11 +257,13 @@ local function buildMainMenu()
     local maxCol = 5
     local col = 0
 
-    libGUI.newControl.ctl_title(panelMainMenu, nil, {
+    _tilteCtl = libGUI.newControl.ctl_title(panelMainMenu, nil, {
         x=0,y=0,w=LCD_W,h=30,
-        text1="Rotorflight2 Touch - " .. LUA_VERSION,
+        text1="Rotorflight2 Touch - ...",
         text1_x=10, bg_color=panelMainMenu.colors.topbar.bg
     })
+    _title_prefix = string.format("Rotorflight2 Touch - %s",LUA_VERSION)
+    refreshTitle()
 
     for i=1, #PageFiles do
         local line = math.floor((i-1)/maxCol)
@@ -310,10 +338,6 @@ local function updateValueChange(fieldId, newVal)
     f.value = clipValue(newVal, (f.min or 0), (f.max or 255))
     f.value = math.floor(f.value*scale/mult + 0.5)*mult/scale
 
-    if rf2.runningInSimulator then
-        return
-    end
-
     for idx=1, #f.vals do
         Page.values[f.vals[idx]] = bit32.rshift(math.floor(f.value*scale + 0.5), (idx-1)*8)
     end
@@ -336,13 +360,15 @@ local function buildFieldsPage()
     local col_id = 0
     local lastFieldY = 0
 
+    log("buildFieldsPage()")
+
     panelFieldsPage = libGUI.newPanel("fieldsPage", {enable_page_scroll=true})
 
-    local title = (Page and Page.title or " ---")
-
-    libGUI.newControl.ctl_title(panelFieldsPage, nil, {x=0,y=0,w=LCD_W,h=30,text1="RF2 / "..title,
+    _tilteCtl = libGUI.newControl.ctl_title(panelFieldsPage, nil, {x=0,y=0,w=LCD_W,h=30,text1="RF2",
         text1_x=10, bg_color=panelFieldsPage.colors.topbar.bg
     })
+    _title_prefix = string.format("RF2 / %s", Page and Page.title or " ---")
+    refreshTitle()
 
     btnReload = libGUI.newControl.ctl_button(panelFieldsPage, "btnReload", {x=300,y=2,w=60,h=25,text="Reload",
         onPress=function()
@@ -381,9 +407,6 @@ local function buildFieldsPage()
     panelFieldsPage.moveFocusAbsolute(#(panelFieldsPage._.elements)) -- (3)
 
     log("currentPageName: %s", currentPageName)
-    if currentPageName == "Rates" then
-        log("currentPageName: %s == rate", currentPageName)
-    end
 
     -- specific display for some pages
     local firstRegularField = 1
@@ -394,12 +417,12 @@ local function buildFieldsPage()
     if vChunk then
         log("found: %s", viewFileName)
         local rateTouchView = vChunk(libgui_dir)
-        firstRegularField,last_y = rateTouchView.buildSpecialFields(libGUI, panelFieldsPage, Page, y, rf2.runningInSimulator, updateValueChange)
+        firstRegularField,last_y = rateTouchView.buildSpecialFields(libGUI, panelFieldsPage, Page, y, updateValueChange)
     end
 
     -- genric display for all pages
     for i=firstRegularField ,#Page.fields do
-        -- log("buildFieldsPage: %s. --", i)
+        log("buildFieldsPage: %s. --", i)
         local f = Page.fields[i]
         log("buildFieldsPage: %s. t: [%s]", i, f.t or "NA")
 
@@ -485,6 +508,8 @@ local function buildFieldsPage()
                 units = ctl_fieldsInfo[f.id].units or ""
             end
 
+            local min = f.min or (f.data and f.data.min) or 0
+            local max = f.min or (f.data and f.data.max) or 0
             log("number_as_button: i=%s, txt=%s, min:%s,max:%s,scale:%s, mult:%s, steps=%s, raw-val: %s", i, txt, f.min, f.max, f.scale, f.mult, (1/(f.scale or 1))*(f.mult or 1), f.value)
             libGUI.newControl.ctl_rf2_button_number(panelFieldsPage, txt, {
                 x=x_Temp, y=y, w=150, h=h_btn,
@@ -557,7 +582,7 @@ end
 
 local function run_ui_spalsh(event, touchState)
     if splash_start_time == 0 then
-        img_bg1 = Bitmap.open("images/splash1.png")
+        img_bg1 = Bitmap.open("touch/images/splash1.png")
         splash_start_time = getTime()
     end
     lcd.clear()
@@ -623,6 +648,12 @@ end
 local function run_ui_pages(event, touchState)
     lcd.clear()
 
+    if Page and Page.timer and (not Page.lastTimeTimerFired or Page.lastTimeTimerFired + 0.5 < rf2.clock()) then
+        Page.lastTimeTimerFired = rf2.clock()
+        log("triggering timer on page: %s", Page.title)
+        Page.timer(Page)
+    end
+
     if not Page then
         collectgarbage()
         Page = assert(rf2.loadScript("PAGES/"..PageFiles[currentPage].script))()
@@ -630,7 +661,6 @@ local function run_ui_pages(event, touchState)
     end
 
     if not(Page.values or Page.isReady) and pageState == pageStatus.display then
-    -- if not Page.values and pageState == pageStatus.display then
         requestPage()
     end
 
@@ -653,6 +683,15 @@ local function run_ui_pages(event, touchState)
 
 end
 
+local function onProcessedMspStatus(aaa, status)
+    rf2.log("onProcessedMspStatus")
+    _fcStatus = status
+
+    rf2.log("onProcessedMspStatus()-> %s", _fcStatus.profile)
+    rf2.log("onProcessedMspStatus()-> %s", _fcStatus.armingDisableFlags)
+    refreshTitle()
+end
+
 local function run_ui(event, touchState)
     -- log("run_ui: [%s] [%s]", event, touchState)
 
@@ -662,6 +701,16 @@ local function run_ui(event, touchState)
         if event == EVT_VIRTUAL_ENTER and killEnterBreak == 1 then
             killEnterBreak = 0
             killEvents(event)   -- X10/T16 issue: pageUp is a long press
+        end
+    end
+
+    local status_interval = 1.5
+    if (not _statusTimer_LastTimeFired or _statusTimer_LastTimeFired + status_interval < rf2.clock()) then
+        _statusTimer_LastTimeFired = rf2.clock()
+        log("triggering _statusTimer_LastTimeFired")
+
+        if rf2.mspQueue:isProcessed() then
+            mspStatus.getStatus(onProcessedMspStatus, self)
         end
     end
 
@@ -708,17 +757,10 @@ local function run_ui(event, touchState)
     rf2.mspQueue:processQueue()
 
 
-    -- log("run_ui: buildFieldsPage(Page: %s,  Page.values: %s, panelFieldsPage: %s)", Page~=nil, Page and Page.values~=nil or "FALSE", panelFieldsPage~=nil)
+    -- log("run_ui: buildFieldsPage(Page: %s,  Page.values: %s, panelFieldsPage: %s, Page.isReady:%s)", Page~=nil, Page and Page.values~=nil or "FALSE", panelFieldsPage~=nil, Page and Page.isReady)
     if panelFieldsPage==nil then
-        if rf2.runningInSimulator then
-            if (Page) then
-                -- simFillValues()
-                buildFieldsPage()
-            end
-        else
-            if (Page and Page.values)then
-                buildFieldsPage()
-            end
+        if (Page and Page.values) or (Page and Page.isReady) then
+            buildFieldsPage()
         end
     end
 

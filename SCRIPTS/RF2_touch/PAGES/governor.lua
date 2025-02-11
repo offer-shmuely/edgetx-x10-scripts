@@ -19,7 +19,7 @@ y = yMinLim - tableSpacing.header
 fields[1] = { t = "Mode",                x = x, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 4,     vals = { 1 }, table = { [0]="OFF", "PASSTHROUGH", "STANDARD", "MODE1", "MODE2" }, id="govMode" }
 fields[2] = { t = "Handover throttle%",  x = x, y = inc.y(lineSpacing), sp = x + sp, min = 10, max = 50,   vals = { 20 },                 id = "govHandoverThrottle" }
 fields[3] = { t = "Startup time",        x = x, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 600,   vals = { 2,3 }, scale = 10,    id = "govStartupTime" }
-fields[4] = { t = "Spoolup time",        x = x, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 600,   vals = { 4,5 }, scale = 10,    id = "govSpoolupTime" }
+fields[4] = { t = "Spoolup time",         x = x, y = inc.y(lineSpacing), sp = x + sp, id = "govSpoolupTime" }
 fields[5] = { t = "Tracking time",       x = x, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 100,   vals = { 6,7 }, scale = 10,    id = "govTrackingTime" }
 fields[6] = { t = "Recovery time",       x = x, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 100,   vals = { 8,9 }, scale = 10,    id ="govRecoveryTime" }
 fields[7] = { t = "AR bailout time",     x = x, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 100,   vals = { 16,17 }, scale = 10,  id = "govAutoBailoutTime" }

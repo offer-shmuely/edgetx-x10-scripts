@@ -10,9 +10,9 @@ local y = yMinLim - lineSpacing
 local inc = { x = function(val) x = x + val return x end, y = function(val) y = y + val return y end }
 local labels = {}
 local fields = {}
-local profileSwitcher = assert(rf2.loadScript("PAGES/helpers/profileSwitcher.lua"))()
+-- local profileSwitcher = assert(rf2.loadScript("PAGES/helpers/profileSwitcher.lua"))()
 
-fields[#fields + 1] = { t = "Current PID profile",     x = x,          y = inc.y(lineSpacing), sp = x + sp * 1.17, data = { value = nil, min = 0, max = 5, table = { [0] = "1", "2", "3", "4", "5", "6" } }, preEdit = profileSwitcher.startPidEditing, postEdit = profileSwitcher.endPidEditing }
+-- fields[#fields + 1] = { t = "Current PID profile",     x = x,          y = inc.y(lineSpacing), sp = x + sp * 1.17, data = { value = nil, min = 0, max = 5, table = { [0] = "1", "2", "3", "4", "5", "6" } }, preEdit = profileSwitcher.startPidEditing, postEdit = profileSwitcher.endPidEditing }
 
 inc.y(lineSpacing * 0.25)
 fields[#fields + 1] = { t = "I-term relax type",       x = x,          y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 2, vals = { 17 }, table = { [0] = "OFF", "RP", "RPY" }, id = "profilesItermRelaxType" }
@@ -36,8 +36,13 @@ fields[#fields + 1] = { t = "CCW stop gain",           x = x + indent, y = inc.y
 fields[#fields + 1] = { t = "Precomp Cutoff",          x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 23 },  id = "profilesYawPrecompCutoff" }
 fields[#fields + 1] = { t = "Cyclic FF gain",          x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 24 },  id = "profilesYawFFCyclicGain" }
 fields[#fields + 1] = { t = "Coll FF gain",            x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 25 },  id = "profilesYawFFCollectiveGain" }
-fields[#fields + 1] = { t = "Coll imp FF gain",        x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 26 },  id = "profilesYawFFImpulseGain" }
-fields[#fields + 1] = { t = "Coll imp FF decay",       x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 27 },  id = "profilesyawFFImpulseDecay" }
+if rf2.apiVersion >= 12.08 then
+    fields[#fields + 1] = { t = "Inertia gain",        x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 42 } }
+    fields[#fields + 1] = { t = "Inertia cutoff",      x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 43 } }
+else
+    fields[#fields + 1] = { t = "Coll imp FF gain",    x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 26 },  id = "profilesYawFFImpulseGain" }
+    fields[#fields + 1] = { t = "Coll imp FF decay",   x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 27 },  id = "profilesyawFFImpulseDecay" }
+end
 
 inc.y(lineSpacing * 0.25)
 labels[#labels + 1] = { t = "Acro Trainer",            x = x,          y = inc.y(lineSpacing) }
@@ -72,12 +77,12 @@ labels[#labels + 1] = { t = "PID Controller",          x = x,          y = inc.y
 fields[#fields + 1] = { t = "R bandwidth",             x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 11 },  id = "profilesGyroCutoffRoll" }
 fields[#fields + 1] = { t = "P bandwidth",             x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 12 },  id = "profilesGyroCutoffPitch" }
 fields[#fields + 1] = { t = "Y bandwidth",             x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 13 },  id = "profilesGyroCutoffYaw" }
-fields[#fields + 1] = { t = "R D-term cut-off",        x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 14 },  id = "profilesDtermCutoffRoll" }
-fields[#fields + 1] = { t = "P D-term cut-off",        x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 15 },  id = "profilesDtermCutoffPitch" }
-fields[#fields + 1] = { t = "Y D-term cut-off",        x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 16 },  id = "profilesDtermCutoffYaw" }
-fields[#fields + 1] = { t = "R B-term cut-off",        x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 39 },  id = "profilesBtermCutoffRoll" }
-fields[#fields + 1] = { t = "P B-term cut-off",        x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 40 },  id = "profilesBtermCutoffPitch" }
-fields[#fields + 1] = { t = "Y B-term cut-off",        x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 41 },  id = "profilesBtermCutoffYaw" }
+fields[#fields + 1] = { t = "R D-term cutoff",         x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 14 },  id = "profilesDtermCutoffRoll" }
+fields[#fields + 1] = { t = "P D-term cutoff",         x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 15 },  id = "profilesDtermCutoffPitch" }
+fields[#fields + 1] = { t = "Y D-term cutoff",         x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 16 },  id = "profilesDtermCutoffYaw" }
+fields[#fields + 1] = { t = "R B-term cutoff",         x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 39 },  id = "profilesBtermCutoffRoll" }
+fields[#fields + 1] = { t = "P B-term cutoff",         x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 40 },  id = "profilesBtermCutoffPitch" }
+fields[#fields + 1] = { t = "Y B-term cutoff",         x = x + indent, y = inc.y(lineSpacing), sp = x + sp, min = 0, max = 250, vals = { 41 },  id = "profilesBtermCutoffYaw" }
 
 return {
     read        = 94, -- MSP_PID_PROFILE
@@ -88,14 +93,14 @@ return {
     minBytes    = 41,
     labels      = labels,
     fields      = fields,
-    --simulatorResponse = { 3, 25, 250, 0, 12, 0, 1, 30, 30, 45, 50, 50, 100, 15, 15, 20, 2, 10, 10, 15, 100, 100, 5, 0, 30, 0, 25, 0, 40, 55, 40, 75, 20, 25, 0, 15, 45, 45, 15, 15, 20 },
-    profileSwitcher = profileSwitcher,
+    simulatorResponse = { 3, 25, 250, 0, 12, 0, 1, 30, 30, 45, 50, 50, 100, 15, 15, 20, 2, 10, 10, 15, 100, 100, 5, 0, 30, 0, 25, 0, 40, 55, 40, 75, 20, 25, 0, 15, 45, 45, 15, 15, 20 },
+    -- profileSwitcher = profileSwitcher,
 
-    postLoad = function(self)
-        self.profileSwitcher.getStatus(self)
-    end,
+    -- postLoad = function(self)
+    --     self.profileSwitcher.getStatus(self)
+    -- end,
 
-    timer = function(self)
-        self.profileSwitcher.checkStatus(self)
-    end,
+    -- timer = function(self)
+    --     self.profileSwitcher.checkStatus(self)
+    -- end,
 }

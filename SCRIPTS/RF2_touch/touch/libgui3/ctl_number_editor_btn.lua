@@ -186,6 +186,7 @@ function ctl_number_editor_btn(panel, id, args)
         panel.drawRectangle(x + 5, y + 2, 10, 10, WHITE, 0)                             -- x exit symbol
         panel.drawText(x + w - 20, y + 5, "x", panel.FONT_SIZES.FONT_8 + BOLD + WHITE)
         panel.drawText(x + 360, y + 6, "Close", panel.FONT_SIZES.FONT_8 + BOLD + GREEN)
+        panel.drawText(x + 20, y + 6, "OK", panel.FONT_SIZES.FONT_6 + BOLD + GREEN)
 
         panel.drawRectangle(x, y, w, h, GREY, 0)                                        -- border
         -- lcd.drawText(x + 5, y + h_header, field_name, FONT_SIZES.FONT_12 + BOLD + CUSTOM_COLOR)
@@ -197,7 +198,7 @@ function ctl_number_editor_btn(panel, id, args)
         -- lcd.drawText(x + w - 5, y + h_header + 2, string.format("max: \n%s", f.min), FONT_SIZES.FONT_8 + BLACK + RIGHT)
         -- lcd.drawText(x + w - 5, y + h - 45, string.format("max: \n%s", f.max), FONT_SIZES.FONT_8 + BLACK + RIGHT)
         -- lcd.drawText(x + 20, y1 + h_header + 20, string.format("%s", f.t2 or f.t), FONT_SIZES.FONT_8 + WHITE)
-        panel.drawText(x+20, y + h -40, string.format("min: %s", self.min), panel.FONT_SIZES.FONT_8 + WHITE)
+        panel.drawText(x+20 , y + h -40, string.format("min: %s", self.min), panel.FONT_SIZES.FONT_8 + WHITE)
         panel.drawText(x+200, y + h -40, string.format("max: %s", self.max), panel.FONT_SIZES.FONT_8 + WHITE)
         -- panel.drawText(x+20, y + self.h_header + 70, string.format("steps: %s", self.steps), panel.FONT_SIZES.FONT_8 + WHITE)
         if self.help ~= nil and self.help ~= "" then
@@ -271,19 +272,19 @@ function ctl_number_editor_btn(panel, id, args)
                 end
             end
 
-            -- exit on X click
+            -- exit on "X" click
             local tsx,tsy = touchState.x, touchState.y
 
-            if (tsx >= self.x+self.w/2 and tsx <= self.x + self.w and tsy >= self.y and tsy <= self.y + self.h_header) then
+            if (tsx >= self.x + self.w -80 and tsx <= self.x + self.w and tsy >= self.y and tsy <= self.y + self.h_header) then
                 -- revert value
                 self.set_value(self.val_org)
                 self.onCancel()
             end
             killEvents(event)   -- X10/T16 issue: pageUp is a long press
 
-            -- save on click
+            -- save on "OK" click
             local tsx,tsy = touchState.x, touchState.y
-            if (tsx >= self.x and tsx <= self.x + self.w/2 and tsy >= self.y and tsy <= self.y + self.h_header) then
+            if (tsx >= self.x and tsx <= self.x + 80 and tsy >= self.y and tsy <= self.y + self.h_header) then
                 -- save value
                 self.onDone(self.get_value())
             end

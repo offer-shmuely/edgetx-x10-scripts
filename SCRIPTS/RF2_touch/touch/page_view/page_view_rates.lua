@@ -2,10 +2,7 @@ local app_name, script_dir = ...
 
 local M = {}
 
--- local function simFillValues()
--- end
-
-function M.buildSpecialFields(libGUI, panel,Page,  y, runningInSimulator, updateValueChange)
+function M.buildSpecialFields(libGUI, panel, Page, y, updateValueChange)
     local num_col = 3
     local row_h = 35
     local col1_w = 160
@@ -34,11 +31,9 @@ function M.buildSpecialFields(libGUI, panel,Page,  y, runningInSimulator, update
             local y = y + (row-1)*row_h
             local i = (col-1)*4 + row
             local f = Page.fields[i]
-            if runningInSimulator and f.label == nil then
-                -- f.value = defaults[i]
-                f.value = Page.simulatorResponse[i]
-
-            end
+            -- if runningInSimulator and f.label == nil then
+            --     f.value = Page.simulatorResponse[i]
+            -- end
 
             libGUI.newControl.ctl_rf2_button_number(panel,  "rates-"..col.."-"..row, {
                 x=x+1, y=y+1, w=col_w-2, h=row_h-2,

@@ -45,8 +45,8 @@ labels[#labels + 1] = { t = "---",                   x = x + indent,     y = inc
 fields[#fields + 1] = { t = "[Erase]",               x = x + indent * 7, y = y }
 
 inc.y(lineSpacing * 0.25)
-fields[#fields + 1] = { t = "Real-time load",        x = x,              y = inc.y(lineSpacing), sp = x + sp, data = { value = 0, scale = 10 }, readOnly = true }
-fields[#fields + 1] = { t = "CPU load",              x = x,              y = inc.y(lineSpacing), sp = x + sp, data = { value = 0, scale = 10 }, readOnly = true }
+fields[#fields + 1] = { t = "Real-time load",        x = x,              y = inc.y(lineSpacing), sp = x + sp, data = { value = 0, min=0, max=1000, scale = 10 }, readOnly = true }
+fields[#fields + 1] = { t = "CPU load",              x = x,              y = inc.y(lineSpacing), sp = x + sp, data = { value = 0, min=0, max=1000, scale = 10 }, readOnly = true }
 
 local function armingDisableFlagsToString(flags)
     local t = ""
@@ -116,6 +116,7 @@ return {
     end,
 
     onProcessedMspStatus = function(self, status)
+        -- rf2.log("onProcessedMspStatus")
         fcStatus = status
         labels[2].t = armingDisableFlagsToString(fcStatus.armingDisableFlags)
         if not editing then
