@@ -1,5 +1,5 @@
 rf2 = {
-    baseDir = "/SCRIPTS/RF2/",
+    baseDir = "/SCRIPTS/RF2_touch/",
     runningInSimulator = string.sub(select(2,getVersion()), -4) == "simu",
     serial_debug = false,
 

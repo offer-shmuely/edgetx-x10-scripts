@@ -58,7 +58,6 @@ local btnReload
 local btnSave
 local isFiledsNeedToSave = false
 
-
 -- Instantiate main menu GUI panel
 local panelTopBar = libGUI.newPanel("panelTopBar")
 local panelMainMenu = libGUI.newPanel("mainMenu", {enable_page_scroll=true})
@@ -67,20 +66,23 @@ local modalWatingPanel = nil
 local modalWatingCtl = nil
 
 local _tilteCtl
-local _title_prefix = ""
-local mspStatus = assert(rf2.loadScript("MSP/mspStatus.lua"))()
+local _title_prefix = "RF2-Touch"
+local mspStatusApi = assert(rf2.loadScript("MSP/mspStatus.lua"))()
 local _statusTimer_LastTimeFired = nil
-local _fcStatus = {
-    armingDisableFlagsString = "",
-    armingDisableFlags = 0,
-    profile = 0,
-    rateProfile = 0,
-    realTimeLoad = 0,
-    cpuLoad = 0,
+local _fcInfo = {
+    rateProfile="",
+    bank="",
+    craftName = "",
 }
 
 -- -------------------------------------------------------------------
 local modalWatingParams = nil
+
+
+local function useMspApi(apiName)
+    collectgarbage()
+    return assert(rf2.loadScript(rf2.baseDir.."MSP/" .. apiName .. ".lua"))()
+end
 
 local function modalWatingStart(text, timeout, retryCount, callbackRetry, callbackGaveup)
     log("modalWating: modalWatingStart(%s)", text)
@@ -129,7 +131,7 @@ local function invalidatePages()
 end
 
 local function rebootFc()
-    --rf2.print("Attempting to reboot the FC...")
+    -- rf2.print("Attempting to reboot the FC...")
     -- pageState = pageStatus.rebooting
     rf2.mspQueue:add({
         command = 68, -- MSP_REBOOT
@@ -140,8 +142,7 @@ local function rebootFc()
     })
 end
 
-local mspEepromWrite =
-{
+local mspEepromWrite = {
     command = 250, -- MSP_EEPROM_WRITE, fails when armed
     processReply = function(self, buf)
         if Page.reboot then
@@ -158,21 +159,21 @@ local function eepromWrite()
 end
 
 rf2.dataBindFields = function()
-    for i=1,#Page.fields do
+    for i = 1, #Page.fields do
         if #Page.values >= Page.minBytes then
             local f = Page.fields[i]
             if f.vals then
                 f.value = 0
-                for idx=1, #f.vals do
+                for idx = 1, #f.vals do
                     local raw_val = Page.values[f.vals[idx]] or 0
-                    raw_val = bit32.lshift(raw_val, (idx-1)*8)
+                    raw_val = bit32.lshift(raw_val, (idx - 1) * 8)
                     f.value = bit32.bor(f.value, raw_val)
                 end
                 local bits = #f.vals * 8
                 if f.min and f.min < 0 and bit32.btest(f.value, bit32.lshift(1, bits - 1)) then
                     f.value = f.value - (2 ^ bits)
                 end
-                f.value = f.value/(f.scale or 1)
+                f.value = f.value / (f.scale or 1)
             end
         end
     end
@@ -180,8 +181,7 @@ end
 
 -- ---------------------------------------------------------------------
 -- old msp handling
-local mspLoadSettings =
-{
+local mspLoadSettings = {
     processReply = function(self, buf)
         if not Page then return end -- could happen if one returns to the main menu before processReply
         rf2.print("Page is processing reply for cmd "..tostring(self.command).." len buf: "..#buf.." expected: "..Page.minBytes)
@@ -190,7 +190,7 @@ local mspLoadSettings =
             if Page.postRead(Page) == -1 then
                 Page.values = nil
                 return
-             end
+            end
         end
         rf2.dataBindFields()
         if Page.postLoad then
@@ -241,7 +241,14 @@ end
 
 local function refreshTitle()
     if _tilteCtl then
-        _tilteCtl.text1 = string.format("%s (Bank: %s Rate: %s)",_title_prefix, _fcStatus.profile+1, _fcStatus.rateProfile+1)
+        local txt
+         if uiState == uiStatus.mainMenu then
+            txt = string.format("%s [%s] (Bank: %s Rate: %s)", _title_prefix, _fcInfo.craftName, _fcInfo.bank, _fcInfo.rateProfile)
+            _tilteCtl.text1 = txt
+         elseif uiState == uiStatus.pages then
+            txt = string.format("%s (Bank:%s Rate:%s)", _title_prefix, _fcInfo.bank, _fcInfo.rateProfile)
+            _tilteCtl.text1 = txt
+         end
     end
 end
 
@@ -258,30 +265,51 @@ local function buildMainMenu()
     local col = 0
 
     _tilteCtl = libGUI.newControl.ctl_title(panelMainMenu, nil, {
-        x=0,y=0,w=LCD_W,h=30,
-        text1="Rotorflight2 Touch - ...",
-        text1_x=10, bg_color=panelMainMenu.colors.topbar.bg
+        x = 0, y = 0, w = LCD_W, h = 30,
+        text1 = _title_prefix,
+        text1_x = 10,
+        bg_color = panelMainMenu.colors.topbar.bg
     })
-    _title_prefix = string.format("Rotorflight2 Touch - %s",LUA_VERSION)
+    _title_prefix = "RF2-Touch"
     refreshTitle()
 
-    for i=1, #PageFiles do
-        local line = math.floor((i-1)/maxCol)
+    libGUI.newControl.ctl_label(panelMainMenu, nil, {
+        x = 435, y = 16,
+        text = string.format("v%s",LUA_VERSION),
+        text_color = WHITE,
+        text_size = panelMainMenu.FONT_SIZES.FONT_6,
+    })
+
+    for i = 1, #PageFiles do
+        local line = math.floor((i - 1) / maxCol)
         local y = 40 + line * (h + lineSpacing_h)
-        local x = 10 + (i - (line*maxCol) -1)*(w+lineSpacing_w)
+        local x = 10 + (i - (line * maxCol) - 1) * (w + lineSpacing_w)
 
         -- local bg = nil -- i.e. default
-        local bg = lcd.RGB(0x22,0x22,0x22)
+        local bg = lcd.RGB(0x22, 0x22, 0x22)
         if false then
             bg = panelMainMenu.colors.active
         end
 
-        libGUI.newControl.ctl_rf2_button_menu(panelMainMenu, nil,
-            {x = x, y = y, w = w, h = h, text = PageFiles[i].t2,
-            bgColor=bg,
-            img=PageFiles[i].img,
-            title_txt=PageFiles[i].per_profile and "Profile" or nil, -- add profile number
-            onPress=function()
+        local txt_title = nil
+        if PageFiles[i].type=="per_profile" then
+            txt_title = string.format("    Bank - %s", _fcInfo.bank)
+        elseif PageFiles[i].type=="per_rate" then
+            txt_title = string.format("    Rate - %s", _fcInfo.rateProfile)
+        elseif PageFiles[i].type=="esc" then
+            txt_title = string.format("    ESC")
+        end
+
+        libGUI.newControl.ctl_rf2_button_menu(panelMainMenu, PageFiles[i].t2, {
+            x = x,
+            y = y,
+            w = w,
+            h = h,
+            text = PageFiles[i].t2,
+            bgColor = bg,
+            img = PageFiles[i].img,
+            title_txt = txt_title,
+            onPress = function()
                 currentPage = i
                 currentPageName = PageFiles[i].title
                 change_state_to_pages()
@@ -295,7 +323,7 @@ end
 local function getLableIfNeed(lastFieldY, field)
     log("getLableIfNeed: lastFieldY=%s, y=%s   (%s)", lastFieldY, field.y, field.t)
 
-    for i=1,#Page.labels do
+    for i = 1, #Page.labels do
         local lbl = Page.labels[i]
 
         local exclude_lable = false
@@ -312,7 +340,7 @@ local function getLableIfNeed(lastFieldY, field)
         -- log("getLableIfNeed: found label: y=%s (%s)", y, lbl.t)
 
         local y = lbl.y
-        if y >= lastFieldY and y <= field.y and exclude_lable==false then
+        if y >= lastFieldY and y <= field.y and exclude_lable == false then
             log("getLableIfNeed: found label: y=%s (%s)", y, lbl.t)
             return lbl
         end
@@ -320,7 +348,7 @@ local function getLableIfNeed(lastFieldY, field)
     return nil
 end
 
-local function clipValue(val,min,max)
+local function clipValue(val, min, max)
     if val < min then
         val = min
     elseif val > max then
@@ -336,10 +364,13 @@ local function updateValueChange(fieldId, newVal)
     local mult = f.mult or 1
     -- f.value = clipValue(newVal/scale, (f.min or 0)/scale, (f.max or 255)/scale)
     f.value = clipValue(newVal, (f.min or 0), (f.max or 255))
-    f.value = math.floor(f.value*scale/mult + 0.5)*mult/scale
+    f.value = math.floor(f.value * scale / mult + 0.5) * mult / scale
 
-    for idx=1, #f.vals do
-        Page.values[f.vals[idx]] = bit32.rshift(math.floor(f.value*scale + 0.5), (idx-1)*8)
+    if f.vals == nil then
+        return
+    end
+    for idx = 1, #f.vals do
+        Page.values[f.vals[idx]] = bit32.rshift(math.floor(f.value * scale + 0.5), (idx - 1) * 8)
     end
     if f.upd and Page.values then
         f.upd(Page)
@@ -348,7 +379,7 @@ end
 
 local function buildFieldsPage()
     local yMinLim = rf2.radio.yMinLimit
-    local h = 30 --24
+    local h = 30 -- 24
     local h_btn = 55
     local w = 400
     local lineSpacing = 10
@@ -367,14 +398,15 @@ local function buildFieldsPage()
     _tilteCtl = libGUI.newControl.ctl_title(panelFieldsPage, nil, {x=0,y=0,w=LCD_W,h=30,text1="RF2",
         text1_x=10, bg_color=panelFieldsPage.colors.topbar.bg
     })
-    _title_prefix = string.format("RF2 / %s", Page and Page.title or " ---")
+    -- _title_prefix = string.format("RF2 / %s", Page and Page.title or " ---")
+    _title_prefix = string.format("/%s", Page and Page.title or " ---")
     refreshTitle()
 
     btnReload = libGUI.newControl.ctl_button(panelFieldsPage, "btnReload", {x=300,y=2,w=60,h=25,text="Reload",
         onPress=function()
             log("reload-data: %s", Page.title)
             log("reloading data: %s", Page.title)
-            modalWatingStart("Reloading data...", 150,0)
+            modalWatingStart("Reloading data...", 150, 0)
             invalidatePages()
         end
     })
@@ -421,7 +453,7 @@ local function buildFieldsPage()
     end
 
     -- genric display for all pages
-    for i=firstRegularField ,#Page.fields do
+    for i = firstRegularField, #Page.fields do
         log("buildFieldsPage: %s. --", i)
         local f = Page.fields[i]
         log("buildFieldsPage: %s. t: [%s]", i, f.t or "NA")
@@ -462,14 +494,14 @@ local function buildFieldsPage()
         if f.label == true then
             col_id = 0
             y = last_y
-            libGUI.newControl.ctl_label(panelFieldsPage, nil, {x=x, y=y, w=val_w, h=h, text=txt})
+            libGUI.newControl.ctl_label(panelFieldsPage, txt, {x=x, y=y, w=val_w, h=h, text=txt})
             y = y + lineSpacingLabel
             last_y = y
             col_id = 0
         elseif f.readOnly == true then
                 col_id = 0
                 y = last_y
-                libGUI.newControl.ctl_label(panelFieldsPage, nil, {x=x, y=y, w=val_w, h=h, text=txt})
+                libGUI.newControl.ctl_label(panelFieldsPage, txt, {x=x, y=y, w=val_w, h=h, text=txt})
                 y = y + lineSpacingLabel
                 last_y = y
                 col_id = 0
@@ -478,9 +510,9 @@ local function buildFieldsPage()
             col_id = 0
             y = last_y
             local theItems = f.table or f.data.table
-            libGUI.newControl.ctl_label(panelFieldsPage, nil, {x=x, y=y, w=0, h=h, text=txt})
+            libGUI.newControl.ctl_label(panelFieldsPage, txt, {x=x, y=y, w=0, h=h, text=txt})
             log("buildFieldsPage: i=%s, table0: %s, table1: %s (total: %s)", i, theItems[0], theItems[1], #theItems)
-            libGUI.newControl.ctl_dropdown(panelFieldsPage, nil,
+            libGUI.newControl.ctl_dropdown(panelFieldsPage, txt,
                 {x=val_x, y=y, w=val_w, h=h, items=theItems, selected=f.value,
                     callback=function(ctl)
                         if f.postEdit then
@@ -497,7 +529,7 @@ local function buildFieldsPage()
             last_y = y
             col_id = 0
         else
-            local x_Temp =10 + (col_id*(150+6))
+            local x_Temp = 10 + (col_id * (150 + 6))
 
             local help = ""
             local units = ""
@@ -513,17 +545,17 @@ local function buildFieldsPage()
             log("number_as_button: i=%s, txt=%s, min:%s,max:%s,scale:%s, mult:%s, steps=%s, raw-val: %s", i, txt, f.min, f.max, f.scale, f.mult, (1/(f.scale or 1))*(f.mult or 1), f.value)
             libGUI.newControl.ctl_rf2_button_number(panelFieldsPage, txt, {
                 x=x_Temp, y=y, w=150, h=h_btn,
-                min=f.min and f.min/(f.scale or 1),
-                max=f.max and f.max/(f.scale or 1),
-                steps=(1/(f.scale or 1))*(f.mult or 1),
-                value=f.value,
-                units=units,
-                text=txt,
-                text_long=txt_long,
-                help=help,
+                min = f.min and f.min / (f.scale or 1),
+                max = f.max and f.max / (f.scale or 1),
+                steps = (1 / (f.scale or 1)) * (f.mult or 1),
+                value = f.value,
+                units = units,
+                text = txt,
+                text_long = txt_long,
+                help = help,
                 -- callbackOnModalActive=function(ctl)    end,
                 -- callbackOnModalInactive=function(ctl)  end
-                onValueUpdated=function(ctl, newVal)
+                onValueUpdated = function(ctl, newVal)
                     updateValueChange(i, newVal)
                 end
             })
@@ -553,7 +585,6 @@ local function updateNeedToSaveFlag()
     end
     -- log("updateNeedToSaveFlag: #panelFieldsPage._.elements=%s", #panelFieldsPage._.elements)
 
-
     local tempNeedToSave = false
     for i, ctl in ipairs(panelFieldsPage._.elements) do
         -- log("updateNeedToSaveFlag: %s (%s) %s (%s)", i, ctl, ctl.text, ctl.id)
@@ -575,7 +606,6 @@ local function updateNeedToSaveFlag()
     -- log("updateNeedToSaveFlag: ---isFiledsNeedToSave=%s---", isFiledsNeedToSave)
 end
 
-
 -- ---------------------------------------------------------------------
 -- init
 -- ---------------------------------------------------------------------
@@ -594,7 +624,6 @@ local function run_ui_spalsh(event, touchState)
     if (elapsedMili >= 10) then
         uiState = uiStatus.init
     end
-
 end
 
 rf2.loadPageFiles = function(setCurrentPageToLastPage)
@@ -608,32 +637,37 @@ end
 local function run_ui_init(event, touchState)
     img_bg1 = nil
     lcd.clear()
-    lcd.drawFilledRectangle(0, 0, LCD_W, 30, COLOR_THEME_SECONDARY1)--lcd.RGB(0xE0, 0xEC, 0xF0))
-    lcd.drawText(10,5,"Rotorflight "..LUA_VERSION, MENU_TITLE_COLOR)
+    lcd.drawFilledRectangle(0, 0, LCD_W, 30, COLOR_THEME_SECONDARY1) -- lcd.RGB(0xE0, 0xEC, 0xF0))
+    lcd.drawText(10, 5, _title_prefix .. " " .. LUA_VERSION, MENU_TITLE_COLOR)
+    lcd.drawText(435, 16, string.format("v%s",LUA_VERSION), MENU_TITLE_COLOR + panelMainMenu.FONT_SIZES.FONT_6 + WHITE)
 
     init = init or assert(rf2.loadScript("ui_init.lua"))()
-    -- drawTextMultiline(4, rf2.radio.yMinLimit, init.t)
     lcd.drawText(10, rf2.radio.yMinLimit, init.t)
-    -- panelInitPage.draw()
-    -- panelInitPage.onEvent(event, touchState)
 
     if not init.f() then
         return 0
     end
     init = nil
+
+    -- get craft name
+    useMspApi("mspName").getModelName(
+        function(_, name)
+            log("triggering name: %s", name)
+            _fcInfo.craftName = name
+        end
+    )
+
     rf2.loadPageFiles()
     invalidatePages()
     buildMainMenu()
     uiState = prevUiState or uiStatus.mainMenu
     prevUiState = nil
-
 end
 
 local function run_ui_menu(event, touchState)
     lcd.clear()
     lcd.drawFilledRectangle(0, 0, LCD_W, LCD_H, lcd.RGB(0x11, 0x11, 0x11))
     -- lcd.drawBitmap(img_title_menu, 0, 0, 100)
-
 
     if libGUI.isNoPrompt() then
         panelMainMenu.draw()
@@ -647,6 +681,8 @@ end
 
 local function run_ui_pages(event, touchState)
     lcd.clear()
+    -- lcd.drawFilledRectangle(0, 0, LCD_W, LCD_H, lcd.RGB(0x11, 0x11, 0x11))
+    lcd.drawFilledRectangle(0, 0, LCD_W, LCD_H, GREY)
 
     if Page and Page.timer and (not Page.lastTimeTimerFired or Page.lastTimeTimerFired + 0.5 < rf2.clock()) then
         Page.lastTimeTimerFired = rf2.clock()
@@ -656,11 +692,11 @@ local function run_ui_pages(event, touchState)
 
     if not Page then
         collectgarbage()
-        Page = assert(rf2.loadScript("PAGES/"..PageFiles[currentPage].script))()
+        Page = assert(rf2.loadScript("PAGES/" .. PageFiles[currentPage].script))()
         collectgarbage()
     end
 
-    if not(Page.values or Page.isReady) and pageState == pageStatus.display then
+    if not (Page.values or Page.isReady) and pageState == pageStatus.display then
         requestPage()
     end
 
@@ -676,19 +712,19 @@ local function run_ui_pages(event, touchState)
 
     if panelFieldsPage then
         panelFieldsPage.draw()
-        if modalWatingPanel==nil then
+        if modalWatingPanel == nil then
             panelFieldsPage.onEvent(event, touchState)
         end
     end
 
 end
 
-local function onProcessedMspStatus(aaa, status)
-    rf2.log("onProcessedMspStatus")
-    _fcStatus = status
+local function onProcessedMspStatus(aaa, mspStatusRes)
+    -- rf2.log("onProcessedMspStatus")
+    _fcInfo.bank = mspStatusRes.profile + 1
+    _fcInfo.rateProfile = mspStatusRes.rateProfile + 1
 
-    rf2.log("onProcessedMspStatus()-> %s", _fcStatus.profile)
-    rf2.log("onProcessedMspStatus()-> %s", _fcStatus.armingDisableFlags)
+    rf2.log("onProcessedMspStatus()-> B:%s, R:%s", _fcInfo.bank, _fcInfo.rateProfile)
     refreshTitle()
 end
 
@@ -700,7 +736,7 @@ local function run_ui(event, touchState)
     if libGUI.isNoPrompt() then
         if event == EVT_VIRTUAL_ENTER and killEnterBreak == 1 then
             killEnterBreak = 0
-            killEvents(event)   -- X10/T16 issue: pageUp is a long press
+            killEvents(event) -- X10/T16 issue: pageUp is a long press
         end
     end
 
@@ -710,7 +746,7 @@ local function run_ui(event, touchState)
         log("triggering _statusTimer_LastTimeFired")
 
         if rf2.mspQueue:isProcessed() then
-            mspStatus.getStatus(onProcessedMspStatus, self)
+            mspStatusApi.getStatus(onProcessedMspStatus, self)
         end
     end
 
@@ -756,9 +792,8 @@ local function run_ui(event, touchState)
 
     rf2.mspQueue:processQueue()
 
-
     -- log("run_ui: buildFieldsPage(Page: %s,  Page.values: %s, panelFieldsPage: %s, Page.isReady:%s)", Page~=nil, Page and Page.values~=nil or "FALSE", panelFieldsPage~=nil, Page and Page.isReady)
-    if panelFieldsPage==nil then
+    if panelFieldsPage == nil then
         if (Page and Page.values) or (Page and Page.isReady) then
             buildFieldsPage()
         end

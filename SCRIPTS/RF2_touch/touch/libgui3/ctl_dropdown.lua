@@ -35,7 +35,7 @@ function dropDown(panel, id, args, flags)
     end
 
     local function onMenu(menu)
-        print("dropd/onMenu()")
+        panel.log("[%s] dropd/onMenu()", id)
         dismissMenu()
         callback(ctlMenu)
     end

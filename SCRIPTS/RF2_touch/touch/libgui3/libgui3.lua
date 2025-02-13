@@ -580,7 +580,7 @@ function M.newPanel(id, args)
             end
         else
             panel._.scrolling = false
-            log("scrolling - END org_y: %s", panel._.org_y)
+            -- log("scrolling - END org_y: %s", panel._.org_y)
             panel._.org_y = panel.y
         end
 
@@ -588,7 +588,7 @@ function M.newPanel(id, args)
         if event == EVT_TOUCH_FIRST then
             if panel._.focus and panel._.elements[panel._.focus].covers(touchState.x, touchState.y) then
                 panel._.scrolling = true
-                log("scrolling - START org_y: %s", panel._.org_y)
+                -- log("scrolling - START org_y: %s", panel._.org_y)
             else
                 if panel.editing then
                     return

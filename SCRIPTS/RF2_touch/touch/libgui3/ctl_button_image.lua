@@ -18,7 +18,7 @@ function button(panel, id, args, flags)
         w = args.w,
         h = args.h,
         bgColor = args.bgColor or panel.colors.btn.bg,
-        img = bitmap.open("images/" .. args.img)
+        img = bitmap.open(args.img)
     }
 
     function self.draw(focused)

@@ -18,7 +18,7 @@ function ctl_rf2_button_menu(panel, id, args, flags)
         title_txt = args.title_txt or nil,
         img = bitmap.open("touch/images/" .. (args.img or "na.png")),
     }
-    panel.log("mainMenuBuild: i=%s, x=%s, y=%s, w=%s, h=%s", id, self.x, self.y, self.w, self.h)
+    panel.log("mainMenuBuild: i=%s, x=%s, y=%s, w=%s, h=%s (%s)", id, self.x, self.y, self.w, self.h, id)
 
     function self.draw(focused)
         local x, y, w, h = self.x, self.y, self.w, self.h
