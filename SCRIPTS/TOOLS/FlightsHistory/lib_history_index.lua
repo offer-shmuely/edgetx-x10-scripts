@@ -58,7 +58,7 @@ function M.getFlightInfoByKey(key)
     local tbl = M.log_files_index_info
     for i = 1, #tbl, 1 do
         local f_info = tbl[i]
-        M.m_log.info("getFlightInfoByKey-" .. f_info.key)
+        -- M.m_log.info("getFlightInfoByKey-" .. f_info.key)
 
         if f_info.key == key then
             M.m_log.info("getFlightInfoByKey- found key: " .. f_info.key)
@@ -126,6 +126,13 @@ function M.historyFileRead()
             local flight_count = m_utils.trim(values[3])
             local duration = m_utils.trim(values[4])
             local model_id = m_utils.trim(values[5])
+
+            -- if not a number, set to -1
+            if not tonumber(duration) then
+                duration = -1
+                M.m_log.info("indexRead: duration is NOT a number")
+            end
+
             M.m_log.info(
                 "indexRead: line: flight_date: %s, model_name: %s, flight_count: %s, duration: %s, model_id: %s",
                 flight_date, model_name, flight_count, duration, model_id)
