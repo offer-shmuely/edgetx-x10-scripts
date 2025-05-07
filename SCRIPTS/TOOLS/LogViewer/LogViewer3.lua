@@ -21,7 +21,7 @@ local M = {}
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2023
-local app_ver = "1.14"
+local app_ver = "1.15"
 
 function M.getVer()
     return app_ver
@@ -151,14 +151,14 @@ local graphSize = 0
 local graphTimeBase = 0
 local graphMinMaxEditorIndex = 0
 
-local img_bg1 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg1.png")
-local img_bg2 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg2.png")
-local img_bg3 = Bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg3.png")
+local img_bg1 = bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg1.png")
+local img_bg2 = bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg2.png")
+local img_bg3 = bitmap.open("/SCRIPTS/TOOLS/LogViewer/bg3.png")
 
 -- Instantiate a new GUI object
-local ctx1 = m_libgui.newGUI()
-local ctx2 = m_libgui.newGUI()
-local ctx3 = m_libgui.newGUI()
+local ctx1 = m_libgui.newPanel()
+local ctx2 = m_libgui.newPanel()
+local ctx3 = m_libgui.newPanel()
 local select_file_gui_init = false
 
 ---- #########################################################################
@@ -267,7 +267,7 @@ end
 local function drawProgress(x, y, current, total)
     --log(string.format("drawProgress(%d. %d, %d)", y, current, total))
     --local x = 140
-    local pct = current / total
+    local pct = (total>0) and (current / total) or 0
     lcd.drawFilledRectangle(x + 1, y + 1, (470 - x - 2) * pct, 14, TEXT_INVERTED_BGCOLOR)
     lcd.drawRectangle(x, y, 470 - x, 16, TEXT_COLOR)
 end
@@ -425,7 +425,7 @@ end
 local function onLogFileChange(obj)
     --m_tables.table_print("log_file_list_filtered", log_file_list_filtered)
 
-    local i = obj.selected
+    local i = obj.getSelected()
     filename = log_file_list_filtered[i]
     log("Selected file index: %d", i)
     log("Selected file: %s", log_file_list_filtered[i])
@@ -434,7 +434,7 @@ local function onLogFileChange(obj)
 end
 
 local function onAccuracyChange(obj)
-    local i = obj.selected
+    local i = obj.selected1
     local accuracy = i
     log("Selected accuracy: %s (%d)", accuracy_list[i], i)
 
@@ -519,7 +519,7 @@ local function filter_log_file_list(filter_model_name, filter_date, need_update)
     -- update the log combo to first
     if need_update == true then
         onLogFileChange(ddLogFile)
-        ddLogFile.selected = 1
+        ddLogFile.selected1 = 1
     end
 end
 
@@ -560,11 +560,11 @@ local function state_SELECT_INDEX_TYPE_init(event, touchState)
     log("state_SELECT_INDEX_TYPE_init()")
     log("creating new window gui")
 
-    ctx3.label(10, 30, 70, 24, "Indexing selection:", m_libgui.FONT_SIZES.FONT_8)
+    ctx3.newControl.ctl_label(ctx3, nil, {x=10, y=30, w=70, h=24, text="Indexing selection:"}, ctx3.FONT_SIZES.FONT_8)
 
-    ctx3.button(90,  60, 320, 55, "Only last flight (fast)", onButtonIndexTypeLastFlight)
-    ctx3.button(90, 130, 320, 55, "Last flights day", onButtonIndexTypeToday)
-    ctx3.button(90, 200, 320, 55, "All flights (slow)", onButtonIndexTypeAll)
+    ctx3.newControl.ctl_button(ctx3, nil, {x=90, y= 60, w=320, h=55, text="Only last flight (fast)", onPress=onButtonIndexTypeLastFlight})
+    ctx3.newControl.ctl_button(ctx3, nil, {x=90, y=130, w=320, h=55, text="Last flights day", onPress=onButtonIndexTypeToday})
+    ctx3.newControl.ctl_button(ctx3, nil, {x=90, y=200, w=320, h=55, text="All flights (slow)", onPress=onButtonIndexTypeAll})
 
     -- default is ALL
     --index_type = INDEX_TYPE.ALL
@@ -624,52 +624,55 @@ local function state_SELECT_FILE_init(event, touchState)
         log("creating new window gui")
         --ctx1 = libGUI.newGUI()
 
-        ctx1.label(10, 25, 120, 24, "log file...", BOLD)
+        ctx1.newControl.ctl_label(ctx1, nil, {x=10, y=25, w=120, h=24, text="log file..."}, BOLD)
 
         --log("setting model filter...")
-        ctx1.label(10, 55, 60, 24, "Model")
-        ddModel = ctx1.dropDown(90, 55, 380, 24, model_name_list, 1,
-            function(obj)
-                local i = obj.selected
+        ctx1.newControl.ctl_label(ctx1, nil, {x=10, y=55, w=60, h=24, text="Model"})
+        ddModel = ctx1.newControl.ctl_dropdown(ctx1, nil, {x=90, y=55, w=380, h=24,
+            items=model_name_list, selected=1,
+            callback=function(obj)
+                local i = obj.selected1
                 filter_model_name = model_name_list[i]
                 filter_model_name_idx = i
                 log("Selected model-name: " .. filter_model_name)
                 filter_log_file_list(filter_model_name, filter_date, true)
             end
-        )
+        })
 
         --log("setting date filter...")
-        ctx1.label(10, 80, 60, 24, "Date")
-        ctx1.dropDown(90, 80, 380, 24, date_list, 1,
-            function(obj)
-                local i = obj.selected
+        ctx1.newControl.ctl_label(ctx1, nil, {x=10, y=90, w=60, h=24, text="Date"})
+        ctx1.newControl.ctl_dropdown(ctx1, nil, {x=90, y=90, w=380, h=24,
+            items=date_list, selected=1,
+            callback=function(obj)
+                local i = obj.selected1
                 filter_date = date_list[i]
                 filter_date_idx = i
                 log("Selected filter_date: " .. filter_date)
                 filter_log_file_list(filter_model_name, filter_date, true)
             end
-        )
+        })
 
         log("setting file combo...")
-        ctx1.label(10, 105, 60, 24, "Log file")
-        ddLogFile = ctx1.dropDown(90, 105, 380, 24, log_file_list_filtered2, filename_idx,
-            onLogFileChange
-        )
+        ctx1.newControl.ctl_label(ctx1, nil, {x=10, y=125, w=60, h=24, text="Log file"})
+        ddLogFile = ctx1.newControl.ctl_dropdown(ctx1, nil, {x=90,y=125,w=380,h=24,
+            items=log_file_list_filtered2, selected=filename_idx,
+            callback=onLogFileChange
+        })
         onLogFileChange(ddLogFile)
 
-        ctx1.label(10, 130, 60, 24, "Accuracy")
-        dd4 = ctx1.dropDown(90, 130, 380, 24, accuracy_list, 1, onAccuracyChange)
+        ctx1.newControl.ctl_label(ctx1, nil, {x=10, y=160, w=60, h=24, text="Accuracy"})
+        dd4 = ctx1.newControl.ctl_dropdown(ctx1, nil, {x=90, y=160, w=380, h=24, items=accuracy_list, selected=1, callback=onAccuracyChange})
         onAccuracyChange(dd4)
 
     end
 
     --filter_model_name_i
-    ddModel.selected = filter_model_name_idx
+    ddModel.selected1 = filter_model_name_idx
     --filter_date_i
-    --ddLogFile.selected = filename_idx
+    --ddLogFile.selected1 = filename_idx
     filter_log_file_list(filter_model_name, filter_date, true)
 
-    ddLogFile.selected = filename_idx
+    ddLogFile.selected1 = filename_idx
 
 
     state = STATE.SELECT_FILE
@@ -792,54 +795,58 @@ local function state_SELECT_SENSORS_INIT(event, touchState)
     -- creating new window gui
     log("creating new window gui")
     ctx2 = nil
-    ctx2 = m_libgui.newGUI()
+    ctx2 = m_libgui.newPanel()
 
-    ctx2.label(10, 25, 120, 24, "Select sensors...", BOLD)
+    ctx2.newControl.ctl_label(ctx2, nil, {x=10, y=25, w=120, h=24, text="Select sensors..."}, BOLD)
 
     log("setting field1...")
-    ctx2.label(10, 55, 60, 24, "Field 1")
-    ctx2.dropDown(90, 55, 380, 24, columns_with_data, sensorSelection[1].idx,
-        function(obj)
-            local i = obj.selected
+    ctx2.newControl.ctl_label(ctx2, nil, {x=10, y=55, w=60, h=24, text="Field 1"})
+    ctx2.newControl.ctl_dropdown(ctx2, nil, {x=90, y=55, w=380, h=24,
+        items=columns_with_data, selected=sensorSelection[1].idx,
+        callback=function(obj)
+            local i = obj.selected1
             local var1 = columns_with_data[i]
             log("Selected var1: " .. var1)
             sensorSelection[1].idx = i
             sensorSelection[1].colId = colWithData2ColByHeader(i)
         end
-    )
+    })
 
-    ctx2.label(10, 80, 60, 24, "Field 2")
-    ctx2.dropDown(90, 80, 380, 24, columns_with_data, sensorSelection[2].idx,
-        function(obj)
-            local i = obj.selected
+    ctx2.newControl.ctl_label(ctx2, nil, {x=10, y=90, w=60, h=24, text="Field 2"})
+    ctx2.newControl.ctl_dropdown(ctx2, nil, {x=90, y=90, w=380, h=24,
+        items=columns_with_data, selected=sensorSelection[2].idx,
+        callback=function(obj)
+            local i = obj.selected1
             local var2 = columns_with_data[i]
             log("Selected var2: " .. var2)
             sensorSelection[2].idx = i
             sensorSelection[2].colId = colWithData2ColByHeader(i)
         end
-    )
+    })
 
-    ctx2.label(10, 105, 60, 24, "Field 3")
-    ctx2.dropDown(90, 105, 380, 24, columns_with_data, sensorSelection[3].idx,
-        function(obj)
-            local i = obj.selected
+    ctx2.newControl.ctl_label(ctx2, nil, {x=10, y=125, w=60, h=24, text="Field 3"})
+    ctx2.newControl.ctl_dropdown(ctx2, nil, {x=90, y=125, w=380, h=24,
+        items=columns_with_data, selected=sensorSelection[3].idx,
+        callback=function(obj)
+            local i = obj.selected1
             local var3 = columns_with_data[i]
             log("Selected var3: " .. var3)
             sensorSelection[3].idx = i
             sensorSelection[3].colId = colWithData2ColByHeader(i)
         end
-    )
+    })
 
-    ctx2.label(10, 130, 60, 24, "Field 4")
-    ctx2.dropDown(90, 130, 380, 24, columns_with_data, sensorSelection[4].idx,
-        function(obj)
-            local i = obj.selected
+    ctx2.newControl.ctl_label(ctx2, nil, {x=10, y=160, w=60, h=24, text="Field 4"})
+    ctx2.newControl.ctl_dropdown(ctx2, nil, {x=90, y=160, w=380, h=24,
+        items=columns_with_data, selected=sensorSelection[4].idx,
+        callback=function(obj)
+            local i = obj.selected1
             local var4 = columns_with_data[i]
             log("Selected var4: " .. var4)
             sensorSelection[4].idx = i
             sensorSelection[4].colId = colWithData2ColByHeader(i)
         end
-    )
+    })
 
     sensorSelection[1].colId = colWithData2ColByHeader(sensorSelection[1].idx)
     sensorSelection[2].colId = colWithData2ColByHeader(sensorSelection[2].idx)

@@ -38,13 +38,14 @@ local m_main_app = nil
 
 local error_desc = nil
 local script_folder = "/SCRIPTS/TOOLS/LogViewer/"
+local libgui_dir = "/SCRIPTS/TOOLS/LogViewer/libgui3"
 
 local function validate_image(file_name)
-    local img1 = Bitmap.open(script_folder .. file_name)
-    local w, h = Bitmap.getSize(img1)
-    if w == 0 and h == 0  then
-        error_desc = "Image file not found: " .. script_folder .. file_name
-    end
+    local img1 = bitmap.open(script_folder .. file_name)
+    local w, h = bitmap.getSize(img1)
+    -- if w == 0 and h == 0  then
+    --     error_desc = "Image file not found: " .. script_folder .. file_name
+    -- end
     img1 = nil
 
     collectgarbage("collect")
@@ -94,7 +95,8 @@ local function validate_files()
     m_index_file = validate_script("lib_file_index", nil, m_log, app_name, m_utils, m_tables, m_lib_file_parser)
     if error_desc ~= nil then return end
 
-    m_libgui = validate_script("libgui", "1.0.3")
+    m_libgui = validate_script("libgui3/libgui3", "3.0.0-dev.1", libgui_dir)
+
     if error_desc ~= nil then return end
 
     m_main_app = validate_script("LogViewer3", app_ver, m_log, m_utils,m_tables,m_lib_file_parser,m_index_file,m_libgui)

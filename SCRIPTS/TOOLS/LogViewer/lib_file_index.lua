@@ -191,11 +191,12 @@ end
 function M.indexSave()
     M.m_log.info("indexSave()")
     --local is_exist = is_file_exists(M.idx_file_name)
-    local hFile = io.open(M.idx_file_name, "w")
 
     -- header
     local line_format = "%-42s,%-10s,%-10s,%-13s,%-11s,%-11s,%s,   %s\n"
     local headline = string.format(line_format, "file_name", "start_time", "end_time", "total_seconds", "total_lines", "start_index", "col_with_data_str", "all_col_str")
+
+    local hFile = io.open(M.idx_file_name, "w")
     io.write(hFile, headline)
     local ver_line = "# api_ver=3\n"
     io.write(hFile, ver_line)
