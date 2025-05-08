@@ -17,7 +17,7 @@
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2023
-local app_ver = "1.14"
+local app_ver = "1.15"
 
 -- to get help:
 -- change in lib_log.lua to "ENABLE_LOG_FILE=true"
