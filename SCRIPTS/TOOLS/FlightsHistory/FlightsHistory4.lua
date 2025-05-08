@@ -190,8 +190,8 @@ local function is_visible_line(line)
         return true
     end
 
-    local  lineModelName = line[2]
-    log("is_visible_line by: [%s] [%s]", filter_model_name, lineModelName)
+    local  lineModelName = line[3]
+    -- log("is_visible_line by: [%s] [%s] --> %s    %s %s %s", filter_model_name, lineModelName, filter_model_name == lineModelName)
     return (filter_model_name == lineModelName)
 end
 
