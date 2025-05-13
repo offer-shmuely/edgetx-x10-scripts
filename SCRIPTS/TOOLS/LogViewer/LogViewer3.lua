@@ -985,15 +985,12 @@ local function state_PARSE_DATA_refresh(event, touchState)
             --log("PARSE_DATA: %d. %s %s", conversionSensorId, val, _values[conversionSensorId][i])
             --log("PARSE_DATA: %d. %s %d %d min:%d max:%d", conversionSensorId, _points[conversionSensorId].name, val, #_points[conversionSensorId].points, _points[conversionSensorId].min, _points[conversionSensorId].max)
 
-            if val ~= nil then
-                if val > _points[conversionSensorId].max then
-                    _points[conversionSensorId].max = val
-                    _points[conversionSensorId].maxpos = i
-                end
-                if val < _points[conversionSensorId].min then
-                    _points[conversionSensorId].min = val
-                    _points[conversionSensorId].minpos = i
-                end
+            if val > _points[conversionSensorId].max then
+                _points[conversionSensorId].max = val
+                _points[conversionSensorId].maxpos = i
+            elseif val < _points[conversionSensorId].min then
+                _points[conversionSensorId].min = val
+                _points[conversionSensorId].minpos = i
             end
 
             if cnt > 100 then
