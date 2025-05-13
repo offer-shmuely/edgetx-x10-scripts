@@ -46,6 +46,16 @@ function M.getFileDataInfo(fileName)
     local columns_by_header = {}
     local columns_is_have_data = {}
     local columns_with_data = {}
+    
+    -- check file size
+    local max_log_size_MB = 2
+    io.seek(hFile, max_log_size_MB * 1024 * 1024)
+    local s = io.read(hFile, 2)
+    io.seek(hFile,0)
+    if string.len(s) > 0 then
+        io.close(hFile)
+        return nil, nil, nil, nil, nil, nil
+    end
 
     -- read Header
     local data1 = io.read(hFile, 2048)
@@ -67,7 +77,7 @@ function M.getFileDataInfo(fileName)
 
     -- stop after 2M (1000x2028)
     local sample_col_data = nil
-    for i = 1, 1000 do
+    for i = 1, 50000 do
         --M.m_log.info("profiler: start")
         --local t1 =getTime()
         local data2 = io.read(hFile, 2048)
