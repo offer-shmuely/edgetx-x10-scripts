@@ -15,9 +15,6 @@ local string_sub = string.sub
 local string_char = string.char
 local string_byte = string.byte
 
---local M.m_log = require("./LogViewer/lib_log")
---local M.m_utils = require("LogViewer/utils")
-
 function M.getTotalSeconds(time)
     local total = tonumber(string.sub(time, 1, 2)) * 3600
     total = total + tonumber(string.sub(time, 4, 5)) * 60

@@ -36,7 +36,7 @@ local function calcCellCount(batt_total_voltage, Lithium_Ion, Lithium_HV)
 
     for i = 1, #voltageRanges do
         if batt_total_voltage < voltageRanges[i] then
-            log("calcCellCount %s --> %s", batt_total_voltage, i)
+            -- log("calcCellCount %s --> %s", batt_total_voltage, i)
             return i
         end
     end

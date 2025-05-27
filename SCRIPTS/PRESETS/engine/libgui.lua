@@ -195,8 +195,8 @@ function M.newGUI()
         if #_.elements == 1 then
             return
         end
-        color = color or M.colors.active
-        gui.drawRectangle(x - 4, y - 2, w + 8, h + 2, color, 2)
+        color = color or M.colors.focus
+        gui.drawRectangle(x - 4, y - 2, w + 8, h + 4, color, 2)
     end -- drawFocus(...)
 
     -- Move focus to another element
@@ -289,8 +289,10 @@ function M.newGUI()
         local guiFocus = not gui.parent or (focused and gui.parent.editing)
         for idx, element in ipairs(_.elements) do
             -- Clients may provide an update function for elements
-            if element.onUpdate then
+            if element.onUpdate then -- new name the method
                 element.onUpdate(element)
+            elseif element.update then -- For backward compatibility 
+                element.update(element)
             end
             if not element.hidden then
                 element.draw(_.focus == idx and guiFocus)
@@ -512,7 +514,7 @@ function M.newGUI()
         function self.draw(focused)
             local fg = M.colors.primary2
             local bg = M.colors.focus
-            local border = M.colors.active
+            local border = M.colors.focus
 
             if self.value then
                 fg = M.colors.primary3

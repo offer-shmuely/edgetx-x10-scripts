@@ -14,8 +14,6 @@ local string_sub = string.sub
 local string_char = string.char
 local string_byte = string.byte
 
---local m_log = require("./LogViewer/lib_log")
-
 function M.split(text)
     local cnt = 0
     local result = {}
