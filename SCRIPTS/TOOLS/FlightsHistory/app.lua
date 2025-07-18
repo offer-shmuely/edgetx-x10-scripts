@@ -72,6 +72,17 @@ local function read_history_file()
     end
 end
 
+local function isFileExist(file_name)
+    log("is_file_exist()")
+    local hFile = io.open(file_name, "r")
+    if hFile == nil then
+        log("file not exist - %s", file_name)
+        return false
+    end
+    io.close(hFile)
+    log("file exist - %s", file_name)
+    return true
+end
 
 local splash_start_time = 0
 local function state_SPLASH_INIT(event, touchState)
@@ -90,23 +101,39 @@ local function state_SPLASH(event, touchState)
     local elapsedMili = elapsed * 10;
     -- was 1500, but most the time will go anyway from the load of the scripts
     -- if (elapsedMili >= 1500) then
-    if (elapsedMili >= 500) then
-            state = STATE.READ_HIST_INIT
+    if (elapsedMili < 500) then
+        return 0
+    end
+    local isHistoryExist = isFileExist( "/flights-history.csv")
+    if isHistoryExist then
+        log("History file exist")
+        state = STATE.READ_HIST_INIT
+    else
+        log("History file does not exist")
+        lvgl.label({x=30, y=180, text="No history file found! \n"
+            .. "This app is working with 'Flights' widget.\n"
+            .. "Please count your flights with 'Flights' widget \n"
+            .. "then use this script.\n"
+        , color=WHITE, font=BOLD})
+        state = STATE.DO_NOTHING
     end
     return 0
 end
 
 local function state_READ_HIST_INIT(event, touchState)
-    local ui = {
-        -- draw top-bar
-        {type="rectangle", x=0, y=0, w=LCD_W, h=20, color=TITLE_BGCOLOR, filled=true},
-        {type="label", x=160, y=1, text="Flight History Viewer", color=WHITE, font=FS.FONT_6},
-        {type="label", x=440, y=1, text="v" .. app_ver, color=WHITE, font=FS.FONT_6},
-        -- {type="image", x=0, y=0, w=LCD_W, h=LCD_H, file=script_folder.."bg2.png"},
-        -- {type="label", x=10, y=25, text="Models Flight Count...", font=BOLD},
-    }
-    lvgl.clear()
-    lvgl.build(ui)
+    -- lvgl.clear()
+    -- lvgl.build({
+    --     -- draw top-bar
+    --     {type="rectangle", x=0, y=0, w=LCD_W, h=20, color=TITLE_BGCOLOR, filled=true},
+    --     {type="label", x=160, y=1, text="Flight History Viewer", color=WHITE, font=FS.FONT_6},
+    --     {type="label", x=440, y=1, text="v" .. app_ver, color=WHITE, font=FS.FONT_6},
+    --     -- {type="image", x=0, y=0, w=LCD_W, h=LCD_H, file=script_folder.."bg2.png"},
+    --     -- {type="label", x=10, y=25, text="Models Flight Count...", font=BOLD},
+    -- })
+
+    lvgl.build({
+        {type="label", x=20, y=200, text="Reading data...", color=ORANGE, font=FS.FONT_12 + BOLD}
+    })
 
     state = STATE.READ_HIST
     return 0
@@ -179,7 +206,7 @@ local function state_SHOW_FLIGHTS_HIST_INIT(event, touchState)
     end
 
     libGUIv4.newCtl.ctl_table(nil, "count-table", {
-        x=10, y=64, w=480, h=LCD_H-60,
+        x=10, y=64, w=LCD_W-10, h=LCD_H-60,
         font=FS.FONT_6,
         header={"Date", "Model", "Flights", "Duration"},
         colX={20, 100, 340, 400},

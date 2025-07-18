@@ -17,10 +17,12 @@ function M(panel, id, args, flags)
         -- args
         x = args.x,
         y = args.y,
-        w = args.w or 0,
-        h = args.h or 0,
+        w = args.w,
+        h = args.h,
         fontSize = args.font or FS.FONT_8,
-        colX = args.colX or 0,
+        fontSizeHeader = args.font_header or FS.FONT_8,
+        textColor = args.textColor or WHITE,
+        colX = args.colX or args.x,
         header = args.header,
         lines = args.lines,
         fIsLineVisible = args.fIsLineVisible or function() return true end,
@@ -29,29 +31,33 @@ function M(panel, id, args, flags)
 
     function self.build_ui()
         -- header
-        local bxHdr = lvgl.box({x=self.x, y=self.y, w=self.w, h=self.h})
-        bxHdr:rectangle({x=0, y=0, w=self.w, h=20, color=DARKGREEN, filled=true})
+        local boxCtl = (self.panel~=nil)
+            and panel:box({x=self.x, y=self.y, w=self.w, h=self.h})
+            or   lvgl.box({x=self.x, y=self.y, w=self.w, h=self.h})
+
+        boxCtl:rectangle({x=0, y=0, w=self.w, h=20, color=DARKGREEN, filled=true})
         for i = 1, self.colNum, 1 do
-            bxHdr:label({x=self.colX[i], y=0,   text=self.header[i], color=WHITE, font=FS.FONT_8})
+            boxCtl:label({x=self.colX[i], y=0,   text=self.header[i], color=self.textColor, font=self.fontSizeHeader})
         end
 
         -- lines
-        local bxLines = bxHdr:box({x=self.x, y=25, flexFlow=lvgl.FLOW_COLUMN, flexPad=2})
+        local bxLines = boxCtl:box({x=0, y=25, flexFlow=lvgl.FLOW_COLUMN, flexPad=2})
 
         for k, obj in pairs(self.lines) do
-
+            log("ctl_table pairs: obj[%d] = %s", k, table.concat(obj, ", "))
             local bxSingleLine = bxLines:box({x=0, y=0, visible=function() return self.fIsLineVisible(obj) end })
-
-            bxSingleLine:button({x=0, y=4,w=12,h=12, cornerRadius=10, color=WHITE})
-            -- bxSingleLine:circle({x=7, y=10, radius=4, filled=true, color=WHITE})
-        local last_x = 0
+            bxSingleLine:button({x=0, y=4,w=12,h=12, cornerRadius=10, color=self.textColor})
+            -- bxSingleLine:circle({x=7, y=10, radius=4, filled=true, color=self.textColor})
             for i = 1, self.colNum, 1 do
                 -- add single line
+                -- log("ctl_table colNum: k: %s, i: %s, = %s", k, i, self.lines[k][i])
+                -- log("ctl_table colNum: %sx%s, txt=%s, x=%s, w=%s  %s", k, i, self.lines[k][i], self.colX[i], self.colX[i+1], self.w -self.colX[i])
                 bxSingleLine:label({
-                    x=self.colX[i], y=0,
-                    w=(self.colX[i+1] or 999)-last_x,
+                    x=self.colX[i],
+                    y=0,
+                    --w=self.colX[i+1] or (self.w -10 - self.colX[i]),
                     text=obj[i],
-                    color=WHITE,
+                    color=self.textColor,
                     font=self.fontSize
                 })
             end
