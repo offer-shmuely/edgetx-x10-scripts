@@ -26,11 +26,11 @@ local app_ver = "1.7"
 
 local app_name = "FlightsHistory"
 
-local script_folder = "/SCRIPTS/TOOLS/FlightsHistory/"
+local script_folder = "/SCRIPTS/TOOLS/FlightsHistory"
 local tool = nil
 
 local function my_load_script(file_name, ...)
-    local code_chunk = assert(loadScript(script_folder .. file_name, "tbd"))
+    local code_chunk = assert(loadScript(script_folder .. "/" .. file_name, "tbd"))
     -- print(string.format("%s - loading, num args: %d", file_name, #{...}))
     return code_chunk(...)
 end

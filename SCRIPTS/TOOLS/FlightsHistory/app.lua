@@ -21,7 +21,7 @@ local M = {}
 -- Author: Offer Shmuely
 -- Date: 2023-2025
 
-local script_folder = "/SCRIPTS/TOOLS/FlightsHistory/"
+local script_folder = "/SCRIPTS/TOOLS/FlightsHistory"
 local filter_model_name
 local filter_model_name_idx = 1
 local model_name_list = { "-- all --" }
@@ -87,7 +87,7 @@ end
 local splash_start_time = 0
 local function state_SPLASH_INIT(event, touchState)
     lvgl.clear()
-    lvgl.image({x=0,y=0,w=LCD_W,h=LCD_H,file=script_folder.."bg1.png"})
+    lvgl.image({x=0,y=0,w=LCD_W,h=LCD_H,file=script_folder.."/bg1.png"})
     state = STATE.SPLASH
     return 0
 end
@@ -127,7 +127,7 @@ local function state_READ_HIST_INIT(event, touchState)
     --     {type="rectangle", x=0, y=0, w=LCD_W, h=20, color=TITLE_BGCOLOR, filled=true},
     --     {type="label", x=160, y=1, text="Flight History Viewer", color=WHITE, font=FS.FONT_6},
     --     {type="label", x=440, y=1, text="v" .. app_ver, color=WHITE, font=FS.FONT_6},
-    --     -- {type="image", x=0, y=0, w=LCD_W, h=LCD_H, file=script_folder.."bg2.png"},
+    --     -- {type="image", x=0, y=0, w=LCD_W, h=LCD_H, file=script_folder.."/bg2.png"},
     --     -- {type="label", x=10, y=25, text="Models Flight Count...", font=BOLD},
     -- })
 
@@ -167,7 +167,7 @@ local function state_SHOW_FLIGHTS_HIST_INIT(event, touchState)
         {type="rectangle", x=0, y=0, w=LCD_W, h=20, color=TITLE_BGCOLOR, filled=true},
         {type="label", x=160, y=1, text="Flight History Viewer", color=WHITE, font=FS.FONT_6},
         {type="label", x=440, y=1, text="v" .. app_ver, color=WHITE, font=FS.FONT_6},
-        -- {type="image", x=0, y=0, w=LCD_W, h=LCD_H, file=script_folder.."bg2.png"},
+        -- {type="image", x=0, y=0, w=LCD_W, h=LCD_H, file=script_folder.."/bg2.png"},
         {type="label", x=10, y=25, text="All Flight...", font=BOLD, color=WHITE},
     })
 
@@ -276,7 +276,7 @@ local function state_FLIGHTS_COUNT_INIT(event, touchState)
         {type="rectangle", x=0, y=0, w=LCD_W, h=20, color=TITLE_BGCOLOR, filled=true},
         {type="label", x=160, y=1, text="Flight History Viewer", color=WHITE, font=FS.FONT_6},
         {type="label", x=440, y=1, text="v" .. app_ver, color=WHITE, font=FS.FONT_6},
-        -- {type="image", x=0, y=0, w=LCD_W, h=LCD_H, file=script_folder.."bg2.png"},
+        -- {type="image", x=0, y=0, w=LCD_W, h=LCD_H, file=script_folder.."/bg2.png"},
         {type="label", x=10, y=25, text="Flight Count...", font=BOLD, color=WHITE},
     })
 
