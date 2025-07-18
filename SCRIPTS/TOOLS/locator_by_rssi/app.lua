@@ -43,10 +43,7 @@ local targetTXPower1 = 10
 local targetTXPower2 = 25
 local nextPlayTime = getTime()
 
-local script_folder = "/SCRIPTS/TOOLS/locator_by_rssi/"
-
-local libGUIv4 = assert(loadScript(script_folder .. "libgui4/libgui4.lua", "tbd"))(script_folder .. "/libgui4")
-
+local script_folder = "/SCRIPTS/TOOLS/locator_by_rssi"
 
 local signalValue, signalMin, signalMax, txPower
 local signalPercent = 0
@@ -205,27 +202,23 @@ local function build_ui()
     lvgl.clear()
 
     lvgl.build({
-        -- draw top-bar
-        -- {type="image", x=0, y=0, w=LCD_W-120, h=LCD_H, file=script_folder.."/locator.png"},
 
         -- background
         {type="rectangle", x=0, y=0, w=LCD_W, h=LCD_H, color=lcd.RGB(0x1F1F1F), filled=true},
-        -- Title
+
+        -- draw top-bar
         {type="rectangle", x=0, y=0, w=LCD_W, h=30, color=DARKBLUE, filled=true},
         {type="label", x=40, y=3, text="Model Locator by RSSI/1RSS", color=WHITE, font=FS.FONT_8},
-        {type="label", x=LCD_W - 50, y=3, text="ver: " .. app_ver, color=WHITE, font=FS.FONT_6},
+        {type="label", x=LCD_W - 50, y=3, text="ver: " .. app_ver, color=LIGHTGREY, font=FS.FONT_6},
         {type="hline", x=0, y=30, w=LCD_W-1, h=1, color=WHITE, opacity=50, filled=true},
 
-        -- status bar
-        -- {type="rectangle", x=0, y=LCD_H-25, w=LCD_W, h=25, color=lcd.RGB(0x0078D4), filled=true},
-
-
         -- signal exist
-        {type="box", x=0, y=0,
+        {type="box", x=0, y=30,
             children={
+                -- {type="image", x=0,y=0,w=LCD_W,h=LCD_H-30, fill=true, file=script_folder.."/locator2.png"},
 
                 -- draw gauge bar
-                {type="arc", x=350, y=150,
+                {type="arc", x=350, y=120,
                     radius=110, thickness=28,
                     startAngle=120, endAngle=function() return 120+(300*signalPercent/100) end, opacity=255,
                     bgStartAngle=120, bgEndAngle=60, bgColor=GREY, bgOpacity=155,
@@ -234,22 +227,22 @@ local function build_ui()
                 },
 
                 -- draw current value
-                {type="label", x=310, y=100,
+                {type="label", x=310, y=80,
                     text=function() return signalPercent end,
                     -- color=function() return signalPercentColor or GREY end,
                     color=WHITE,
                     font=FS.FONT_38
                 },
-                {type="label", x=340, y=170,
+                {type="label", x=340, y=140,
                     text="%",
                     color=WHITE,
                     font=FS.FONT_16
                 },
 
                 -- {type="label", x=10 , y=LCD_H-22, text=function() return line1 or "" end, color=WHITE, font=FS.FONT_8},
-                {type="label", x=10 , y=50, text="Signal Type:", color=WHITE, font=FS.FONT_8},
+                {type="label", x=10 , y=20, text="Signal Type:", color=WHITE, font=FS.FONT_8},
 
-                { type = "choice", x=120, y=45, w=130, title = "Telemetry",
+                { type = "choice", x=120, y=15, w=130, title = "Telemetry",
                     values = {"---", "Frsky RSSI", "elrs Anntena 1", "elrs Anntena 2"},
                     get = function() return signalType end,
                     set = function(i)
@@ -257,22 +250,21 @@ local function build_ui()
                     end ,
                 },
 
-
                 -- beep button
-                {type="label", x=20, y=95, text="Beep:", color=WHITE, font=FS.FONT_8},
-                {type="toggle", x=80, y=90,
+                {type="label", x=20, y=65, text="Beep:", color=WHITE, font=FS.FONT_8},
+                {type="toggle", x=80, y=60,
                     get=(function() return is_beep end),
                     set=(function(val) is_beep = (val==1) end)
                 },
                 -- haptic
-                {type="label", x=20, y=135, text="Haptic:", color=WHITE, font=FS.FONT_8},
-                {type="toggle", x=80, y=130,
+                {type="label", x=20, y=105, text="Haptic:", color=WHITE, font=FS.FONT_8},
+                {type="toggle", x=80, y=100,
                     get=(function() return useHaptic end),
                     set=(function(val) useHaptic = (val==1) end)
                 },
 
                 -- draw raw  value
-                {type="label", x=10, y=170,
+                {type="label", x=10, y=140,
                     text=function() return "Raw value: " .. tostring(signalValue) .. "db" end,
                     -- color=function() return signalPercentColor or GREY end,
                     color=LIGHTGREY,
@@ -280,14 +272,14 @@ local function build_ui()
                 },
 
                 -- tx power
-                {type="label", x=10, y=190,
+                {type="label", x=10, y=160,
                     text=function() return "TX Power: " .. tostring(txPower) .. "mW" end,
                     -- color=function() return ((txPower == targetTXPower1)or(txPower == targetTXPower2)) and DARKGREEN or RED end,
                     color=LIGHTGREY,
                     font=FS.FONT_8
                 },
 
-                {type="box", x=50, y=210,
+                {type="box", x=50, y=180,
                     children={
                         {type="label", x=0, y=0, text="!! Set TX Power to 25mW", color=RED, font=FS.FONT_8},
                         {type="label", x=0, y=20,text="!! Set TX Dynamic=OFF",color=RED,font=FS.FONT_8},
@@ -296,36 +288,23 @@ local function build_ui()
                         return is_elrs==true and txPower ~= targetTXPower1 and txPower ~= targetTXPower2
                     end,
                 },
-
-
             },
-
             visible=function()
                 return getRSSI() ~= 0
             end
         },
 
-                -- no signal
-        {type="box", x=0, y=0,
+        -- no signal
+        {type="box", x=0, y=30,
             children={
+                {type="image", x=0,y=0,w=LCD_W,h=LCD_H-30, fill=true, file=script_folder.."/locator1.png"},
                 -- {type="rectangle", x=20, y=30+20, w=LCD_W-20*2, h=LCD_H-30-20*2, color=GREY, filled=true, opacity=230},
-                {type="label", x=50, y=90, text="No signal found\n waiting for: RSSI/1RSS/2RSS", color=RED, font=FS.FONT_12},
+                {type="label", x=50, y=170, text="No signal found \nwaiting for: RSSI/1RSS/2RSS", color=RED, font=FS.FONT_12},
             },
-
             visible=function()
                 return getRSSI() == 0
             end
         },
-
-
-        libGUIv4.newCtl.ctl_hourglass(nil, "hourglass", {
-            x=10, y=64, radio=60,
-            font=FS.FONT_6,
-        })
-
-
-
-
     })
 
     return 0
