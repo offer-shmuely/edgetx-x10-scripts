@@ -1,4 +1,5 @@
-local libgui_dir = ...
+local args = {...}
+local libgui_dir = args[1]
 
 local app_ver = "0.0.0-dev.1"
 
@@ -24,7 +25,7 @@ for ctl_name in dir(libgui_dir) do
     local file_name_short = string.match(ctl_name, "^(ctl_.+).lua$")
     if file_name_short ~= nil then
         M.log("loadControl(%s)", ctl_name)
-        M.newCtl[file_name_short] = assert(loadScript(M.libgui_dir .. "/" .. ctl_name, "tcd"))()
+        M.newCtl[file_name_short] = assert(loadScript(M.libgui_dir .. "/" .. ctl_name, "btd"))()
         M.log("ctl_file: %s, flie_name_short: %s", ctl_name, file_name_short)
     end
 end
