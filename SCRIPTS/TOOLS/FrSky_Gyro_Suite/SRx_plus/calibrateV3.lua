@@ -117,7 +117,7 @@ local function runCalibrationPageForHorus(event)
   local centerX = LCD_W / 2
 
   if(calibrationStep < 6) then
-    lcd.drawText(centerX, 50, "Place your Stabilizer Rx as shown in the image.", TEXT_COLOR + CENTER)
+    lcd.drawText(centerX, 50, "Place your Stabilizer Rx as shown in the image.", COLOR_THEME_SECONDARY1 + CENTER)
     if calibBitmaps[calibrationStep + 1] == nil then
       calibBitmaps[calibrationStep + 1] = Bitmap.open(calibBitmapsFile[calibrationStep + 1])
     end
@@ -129,14 +129,14 @@ local function runCalibrationPageForHorus(event)
     -- end
 
     if calibrationState == CALIBRATION_INIT then
-      lcd.drawText(centerX, 220, "Press [Enter] when ready", INVERS + CENTER)
+      lcd.drawText(centerX, 220, "Press [Enter] when ready", COLOR_THEME_SECONDARY1 + INVERS + CENTER)
     else
-      lcd.drawText(centerX, 220, "Waiting...", CENTER)
+      lcd.drawText(centerX, 220, "Waiting...", COLOR_THEME_SECONDARY1 + CENTER)
     end
   else
-    lcd.drawText(centerX, 50, "Calibration completed", CENTER)
+    lcd.drawText(centerX, 50, "Calibration completed", COLOR_THEME_SECONDARY1 + CENTER)
     lcd.drawBitmap(Bitmap.open("img/cali_ok.png"),200, 100)
-    lcd.drawText(centerX, 220, "Press [Enter] to exit", INVERS + CENTER)
+    lcd.drawText(centerX, 220, "Press [Enter] to exit", COLOR_THEME_SECONDARY1 + INVERS + CENTER)
   end
   if calibrationStep >= 6 and (event == EVT_VIRTUAL_ENTER or event == EVT_VIRTUAL_EXIT) then
     return 2
@@ -273,7 +273,7 @@ local function runDetectRX(event)
   lcd.clear()
   drawScreenTitle("SRx+ ("..version..")", page, #pages)
 
-  lcd.drawText(160, 220, "Detecting RX..Please Wait...")
+  lcd.drawText(160, 220, "Detecting RX..Please Wait...", COLOR_THEME_SECONDARY1)
 
 
   if detectionState == CALIBRATION_READ then
