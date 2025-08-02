@@ -21,7 +21,7 @@ local M = {}
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2023
-local app_ver = "1.15"
+local app_ver = "1.16"
 
 function M.getVer()
     return app_ver
@@ -269,7 +269,7 @@ local function drawProgress(x, y, current, total)
     --local x = 140
     local pct = (total>0) and (current / total) or 0
     lcd.drawFilledRectangle(x + 1, y + 1, (470 - x - 2) * pct, 14, TEXT_INVERTED_BGCOLOR)
-    lcd.drawRectangle(x, y, 470 - x, 16, TEXT_COLOR)
+    lcd.drawRectangle(x, y, 470 - x, 16, COLOR_THEME_SECONDARY1)
 end
 
 local function get_log_files_list()
@@ -382,9 +382,9 @@ local function read_and_index_file_list()
             lcd.drawText(440, 1, "v" .. app_ver, WHITE + SMLSIZE)
 
             -- draw state
-            lcd.drawText(5, 30, "Analyzing & indexing files", TEXT_COLOR + BOLD)
-            lcd.drawText(5, 60, string.format("indexing files: (%d/%d)", log_file_list_raw_idx, #log_file_list_raw), TEXT_COLOR + SMLSIZE)
-            lcd.drawText(5, 90, string.format("* %s", filename), TEXT_COLOR + SMLSIZE)
+            lcd.drawText(5, 30, "Analyzing & indexing files", COLOR_THEME_SECONDARY1 + BOLD)
+            lcd.drawText(5, 60, string.format("indexing files: (%d/%d)", log_file_list_raw_idx, #log_file_list_raw), COLOR_THEME_SECONDARY1 + SMLSIZE)
+            lcd.drawText(5, 90, string.format("* %s", filename), COLOR_THEME_SECONDARY1 + SMLSIZE)
             lcd.drawText(30, 1, "/LOGS/" .. filename, WHITE + SMLSIZE)
 
             drawProgress(160, 60, log_file_list_raw_idx, #log_file_list_raw)
@@ -560,7 +560,7 @@ local function state_SELECT_INDEX_TYPE_init(event, touchState)
     log("state_SELECT_INDEX_TYPE_init()")
     log("creating new window gui")
 
-    ctx3.newControl.ctl_label(ctx3, nil, {x=10, y=30, w=70, h=24, text="Indexing selection:"}, ctx3.FONT_SIZES.FONT_8)
+    ctx3.newControl.ctl_label(ctx3, nil, {x=40, y=30, w=70, h=24, text="Indexing selection:"}, ctx3.FONT_SIZES.FONT_8 + COLOR_THEME_SECONDARY1)
 
     ctx3.newControl.ctl_button(ctx3, nil, {x=90, y= 60, w=320, h=55, text="Only last flight (fast)", onPress=onButtonIndexTypeLastFlight})
     ctx3.newControl.ctl_button(ctx3, nil, {x=90, y=130, w=320, h=55, text="Last flights day", onPress=onButtonIndexTypeToday})
@@ -624,10 +624,10 @@ local function state_SELECT_FILE_init(event, touchState)
         log("creating new window gui")
         --ctx1 = libGUI.newGUI()
 
-        ctx1.newControl.ctl_label(ctx1, nil, {x=10, y=25, w=120, h=24, text="log file..."}, BOLD)
+        ctx1.newControl.ctl_label(ctx1, nil, {x=20, y=25, text="log file..."}, COLOR_THEME_SECONDARY1 + BOLD)
 
         --log("setting model filter...")
-        ctx1.newControl.ctl_label(ctx1, nil, {x=10, y=55, w=60, h=24, text="Model"})
+        ctx1.newControl.ctl_label(ctx1, nil, {x=20, y=55, text="Model"})
         ddModel = ctx1.newControl.ctl_dropdown(ctx1, nil, {x=90, y=55, w=380, h=24,
             items=model_name_list, selected=1,
             callback=function(obj)
@@ -640,7 +640,7 @@ local function state_SELECT_FILE_init(event, touchState)
         })
 
         --log("setting date filter...")
-        ctx1.newControl.ctl_label(ctx1, nil, {x=10, y=90, w=60, h=24, text="Date"})
+        ctx1.newControl.ctl_label(ctx1, nil, {x=20, y=90, text="Date"})
         ctx1.newControl.ctl_dropdown(ctx1, nil, {x=90, y=90, w=380, h=24,
             items=date_list, selected=1,
             callback=function(obj)
@@ -653,14 +653,14 @@ local function state_SELECT_FILE_init(event, touchState)
         })
 
         log("setting file combo...")
-        ctx1.newControl.ctl_label(ctx1, nil, {x=10, y=125, w=60, h=24, text="Log file"})
+        ctx1.newControl.ctl_label(ctx1, nil, {x=20, y=125, text="Log file"})
         ddLogFile = ctx1.newControl.ctl_dropdown(ctx1, nil, {x=90,y=125,w=380,h=24,
             items=log_file_list_filtered2, selected=filename_idx,
             callback=onLogFileChange
         })
         onLogFileChange(ddLogFile)
 
-        ctx1.newControl.ctl_label(ctx1, nil, {x=10, y=160, w=60, h=24, text="Accuracy"})
+        ctx1.newControl.ctl_label(ctx1, nil, {x=20, y=160, text="Accuracy"})
         dd4 = ctx1.newControl.ctl_dropdown(ctx1, nil, {x=90, y=160, w=380, h=24, items=accuracy_list, selected=1, callback=onAccuracyChange})
         onAccuracyChange(dd4)
 
@@ -874,9 +874,9 @@ end
 
 local function display_read_data_progress(conversionSensorId, conversionSensorProgress)
     --log("display_read_data_progress(%d, %d)", conversionSensorId, conversionSensorProgress)
-    lcd.drawText(5, 25, "Reading data from file...", TEXT_COLOR)
+    lcd.drawText(5, 25, "Reading data from file...", COLOR_THEME_SECONDARY1)
 
-    lcd.drawText(5, 60, "Reading line: " .. lines, TEXT_COLOR)
+    lcd.drawText(5, 60, "Reading line: " .. lines, COLOR_THEME_SECONDARY1)
     drawProgress(140, 60, lines, current_session.total_lines)
 
     local done_var_1 = 0
@@ -903,16 +903,16 @@ local function display_read_data_progress(conversionSensorId, conversionSensorPr
     end
     local y = 85
     local dy = 25
-    lcd.drawText(5, y, "Parsing Field 1: ", TEXT_COLOR)
+    lcd.drawText(5, y, "Parsing Field 1: ", COLOR_THEME_SECONDARY1)
     drawProgress(140, y, done_var_1, valPos)
     y = y + dy
-    lcd.drawText(5, y, "Parsing Field 2: ", TEXT_COLOR)
+    lcd.drawText(5, y, "Parsing Field 2: ", COLOR_THEME_SECONDARY1)
     drawProgress(140, y, done_var_2, valPos)
     y = y + dy
-    lcd.drawText(5, y, "Parsing Field 3: ", TEXT_COLOR)
+    lcd.drawText(5, y, "Parsing Field 3: ", COLOR_THEME_SECONDARY1)
     drawProgress(140, y, done_var_3, valPos)
     y = y + dy
-    lcd.drawText(5, y, "Parsing Field 4: ", TEXT_COLOR)
+    lcd.drawText(5, y, "Parsing Field 4: ", COLOR_THEME_SECONDARY1)
     drawProgress(140, y, done_var_4, valPos)
 
 end

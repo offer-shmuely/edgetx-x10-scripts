@@ -17,7 +17,7 @@
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2023
-local app_ver = "1.15"
+local app_ver = "1.16"
 
 -- to get help:
 -- change in lib_log.lua to "ENABLE_LOG_FILE=true"
@@ -122,8 +122,8 @@ local function run(event, touchState)
     if error_desc ~= nil then
         print(error_desc)
         lcd.clear()
-        lcd.drawText(5, 30, "Error:", TEXT_COLOR + BOLD)
-        lcd.drawText(5, 60, error_desc, TEXT_COLOR + BOLD)
+        lcd.drawText(5, 30, "Error:", COLOR_THEME_SECONDARY1 + BOLD)
+        lcd.drawText(5, 60, error_desc, COLOR_THEME_SECONDARY1 + BOLD)
         return 0
     end
 
