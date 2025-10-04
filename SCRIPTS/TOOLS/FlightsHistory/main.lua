@@ -16,7 +16,7 @@
 -- This script display the flights history as kept using the "Flights" widget
 -- Author: Offer Shmuely
 -- Date: 2023-2025
-local app_ver = "1.7"
+local app_ver = "1.8"
 
 -- to get help:
 -- change in lib_log.lua to "ENABLE_LOG_FILE=true"
@@ -27,7 +27,6 @@ local app_ver = "1.7"
 local app_name = "FlightsHistory"
 
 local script_folder = "/SCRIPTS/TOOLS/FlightsHistory"
-local tool = nil
 
 local function my_load_script(file_name, ...)
     local code_chunk = assert(loadScript(script_folder .. "/" .. file_name, "tbd"))
@@ -35,19 +34,11 @@ local function my_load_script(file_name, ...)
     return code_chunk(...)
 end
 
-local function init()
-    local m_log = my_load_script("lib_log", app_name, "/SCRIPTS/TOOLS/" .. app_name)
-    local m_utils = my_load_script("lib_utils", m_log, app_name)
-    local m_tables = my_load_script("lib_tables", m_log, app_name)
-    local m_index_file = my_load_script("lib_history_index", m_log, app_name, m_utils, m_tables)
-    local m_libgui = my_load_script("libgui4/libgui4.lua", script_folder .. "/libgui4")
+local m_log =       my_load_script("lib_log",               app_name, "/SCRIPTS/TOOLS/"..app_name)
+local m_utils =     my_load_script("lib_utils",             m_log, app_name)
+local m_tables =    my_load_script("lib_tables",            m_log, app_name)
+local m_index_file= my_load_script("lib_history_index",     m_log, app_name, m_utils, m_tables)
+local m_libgui =    my_load_script("libgui4/libgui4.lua",   script_folder.."/libgui4")
+local app =         my_load_script("app",                   m_log, m_utils,m_tables,m_index_file,m_libgui,app_ver)
 
-    tool = my_load_script("app", m_log, m_utils,m_tables,m_index_file,m_libgui,app_ver)
-    return tool.init()
-end
-
-local function run(event, touchState)
-    return tool.run(event, touchState)
-end
-
-return { init=init, run=run, useLvgl=true }
+return { init=app.init, run=app.run, useLvgl=true }
