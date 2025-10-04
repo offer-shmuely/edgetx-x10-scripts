@@ -17,7 +17,7 @@
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2023
-local app_ver = "1.16"
+local app_ver = "1.17"
 
 -- to get help:
 -- change in lib_log.lua to "ENABLE_LOG_FILE=true"
@@ -99,7 +99,7 @@ local function validate_files()
 
     if error_desc ~= nil then return end
 
-    m_main_app = validate_script("LogViewer3", app_ver, m_log, m_utils,m_tables,m_lib_file_parser,m_index_file,m_libgui)
+    m_main_app = validate_script("app", app_ver, m_log, m_utils,m_tables,m_lib_file_parser,m_index_file,m_libgui)
     if error_desc ~= nil then return end
 
 

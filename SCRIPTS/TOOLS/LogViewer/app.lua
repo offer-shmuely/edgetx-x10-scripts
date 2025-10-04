@@ -21,7 +21,7 @@ local M = {}
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2023
-local app_ver = "1.16"
+local app_ver = "1.17"
 
 function M.getVer()
     return app_ver
@@ -512,7 +512,7 @@ local function filter_log_file_list(filter_model_name, filter_date, need_update)
             local is_new, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str = m_index_file.getFileDataInfo(log_file_list_filtered[i])
             log_file_list_filtered2[#log_file_list_filtered2 +1] = string.format("%s (%.0fmin)", log_file_list_filtered[i], total_seconds/60)
         end
-        --m_tables.table_print("prepare friendly names", log_file_list_filtered2)
+        m_tables.table_print("prepare friendly names", log_file_list_filtered2)
     end
     --m_tables.table_print("filter_log_file_list", log_file_list_filtered)
 

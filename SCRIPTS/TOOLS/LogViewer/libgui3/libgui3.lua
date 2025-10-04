@@ -62,6 +62,7 @@ function M.getVer()
 end
 
 function M.log(fmt, ...)
+    if fmt == nil then return end
     print(string.format("111: " .. fmt, ...))
 end
 function log(fmt, ...)
