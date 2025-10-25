@@ -69,6 +69,7 @@ function menu(panel, id, args, flags)
     function self.draw(focused)
         local flags = panel.getFlags(self)
         local visibleCount = math.min(visibleCount, itemCount)
+        visibleCount = math.min(visibleCount, #self.items1)
         local sel
         local bgColor
 
@@ -82,10 +83,17 @@ function menu(panel, id, args, flags)
             bgColor = panel.colors.list.selected.bg
         end
 
+
         for i = 0, visibleCount - 1 do
             local j = firstVisible + i
             local y = self.y + i * lh
 
+            panel.log('self.items1:');
+            for k, v in ipairs(self.items1) do
+                panel.log("  %d: %s", k, v)
+            end
+
+            panel.log("111 j:%d visibleCount:%d itemCount:%d", j, visibleCount, itemCount)
             assert(self.items1)
             assert(self.items1[j])
             local x1 = panel._.align_w(self.x, self.w, flags)
@@ -104,7 +112,7 @@ function menu(panel, id, args, flags)
     end
 
     function self.onEvent(event, touchState)
-        print(string.format("menu - onEvent"))
+        panel.log("menu - onEvent")
         local visibleCount = math.min(visibleCount, itemCount)
 
         if moving ~= 0 then
@@ -149,10 +157,10 @@ function menu(panel, id, args, flags)
                 elseif panel.match(event, EVT_VIRTUAL_NEXT, EVT_VIRTUAL_PREV) then
                     if event == EVT_VIRTUAL_NEXT then
                         selected1 = math.min(itemCount, selected1 + 1)
-                        print(string.format("EVT_VIRTUAL_NEXT --> selected: %d", selected1))
+                        panel.log("EVT_VIRTUAL_NEXT --> selected: %d", selected1)
                     elseif event == EVT_VIRTUAL_PREV then
                         selected1 = math.max(1, selected1 - 1)
-                        print(string.format("EVT_VIRTUAL_PREV --> selected: %d", selected1))
+                        panel.log("EVT_VIRTUAL_PREV --> selected: %d", selected1)
                     end
                     adjustScroll()
                     --self.callback(self, "temp") --???
@@ -160,7 +168,7 @@ function menu(panel, id, args, flags)
                     if panel.editing then
                         if touchState then
                             selected1 = firstVisible + math.floor((touchState.y - self.y) / lh)
-                            print(string.format("111 EVT_VIRTUAL_ENTER --> selected: %d", selected1))
+                            panel.log("111 EVT_VIRTUAL_ENTER --> selected: %d", selected1)
                         end
 
                         panel.editing = false

@@ -25,16 +25,17 @@ function M(panel, id, args, flags)
         colX = args.colX or args.x,
         header = args.header,
         lines = args.lines,
+        maxLinesToShow = (args.maxLines ~= nil) and math.min(args.maxLines, #args.lines) or #args.lines, -- max lines to show
         fIsLineVisible = args.fIsLineVisible or function() return true end,
     }
     -- log("ctl_table [%s] x: %d, y: %d, w: %d, h: %d", id, self.x, self.y, self.w, self.h)
 
     function self.build_ui()
-        -- header
         local boxCtl = (self.panel~=nil)
             and panel:box({x=self.x, y=self.y, w=self.w, h=self.h})
             or   lvgl.box({x=self.x, y=self.y, w=self.w, h=self.h})
 
+        -- header
         boxCtl:rectangle({x=0, y=0, w=self.w, h=20, color=DARKGREEN, filled=true})
         for i = 1, self.colNum, 1 do
             boxCtl:label({x=self.colX[i], y=0,   text=self.header[i], color=self.textColor, font=self.fontSizeHeader})
@@ -43,8 +44,8 @@ function M(panel, id, args, flags)
         -- lines
         local bxLines = boxCtl:box({x=0, y=25, flexFlow=lvgl.FLOW_COLUMN, flexPad=2})
 
-        for k, obj in pairs(self.lines) do
-            log("ctl_table pairs: obj[%d] = %s", k, table.concat(obj, ", "))
+        for lineIdx = 1, self.maxLinesToShow do
+            local obj = self.lines[lineIdx]
             local bxSingleLine = bxLines:box({x=0, y=0, visible=function() return self.fIsLineVisible(obj) end })
             bxSingleLine:button({x=0, y=4,w=12,h=12, cornerRadius=10, color=self.textColor})
             -- bxSingleLine:circle({x=7, y=10, radius=4, filled=true, color=self.textColor})
@@ -62,6 +63,7 @@ function M(panel, id, args, flags)
                 })
             end
         end
+
 
     end
 

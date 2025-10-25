@@ -59,19 +59,6 @@ local function compare_date_first(a1, b1)
     return (a > b)
 end
 
--- read log file list
-local function read_history_file()
-    log("read_history_file: init")
-    m_index_file.indexInit()
-    m_index_file.historyFileRead()
-
-    for i = 1, #m_index_file.log_files_index_info do
-        local flight_info = m_index_file.log_files_index_info[i]
-        -- log("to model name list: %d. %s", i, flight_info.model_name)
-        m_tables.list_ordered_insert(model_name_list, flight_info.model_name, compare_names, 2)
-    end
-end
-
 local function isFileExist(file_name)
     log("is_file_exist()")
     local hFile = io.open(file_name, "r")
@@ -139,7 +126,17 @@ local function state_READ_HIST_INIT(event, touchState)
     return 0
 end
 local function state_READ_HIST(event, touchState)
-    read_history_file()
+    -- read log file list
+    log("read_history_file: init")
+    m_index_file.indexInit()
+    m_index_file.historyFileRead()
+
+    for i = 1, #m_index_file.log_files_index_info do
+        local flight_info = m_index_file.log_files_index_info[i]
+        -- log("to model name list: %d. %s", i, flight_info.model_name)
+        m_tables.list_ordered_insert(model_name_list, flight_info.model_name, compare_names, 2)
+    end
+
     state = STATE.SHOW_FLIGHTS_HIST_INIT
     return 0
 end
@@ -212,6 +209,7 @@ local function state_SHOW_FLIGHTS_HIST_INIT(event, touchState)
         colX={20, 100, 340, 400},
         lines=lines_csv,
         fIsLineVisible=is_visible_line,
+        maxLines=50,
     })
 
     for i = 1, #model_name_list do
@@ -236,8 +234,6 @@ end
 -- ----------------------------------------------------------------------------------------------------------
 
 local function calculate_model_summary_list()
-    local model_summary_list = {}
-    log("calculate_model_summary_list()")
 
     local model_flight_count = {}
     for i = 1, #m_index_file.log_files_index_info do
@@ -254,13 +250,30 @@ local function calculate_model_summary_list()
         model_flight_count[flight_info.model_name] = flight_info.flight_count
     end
 
+    -- for k, v in pairs(model_flight_count) do
+    --     local inf = string.format("===================== %-17s - %d flights", k, v)
+    --     -- local inf = string.format("%03d - %s", v, k)
+    --     log("model_flight_count: %s", inf)
+    --     model_summary_list[#model_summary_list +1] = {k, v}
+    -- end
+
+    local keys = {}
+    for k in next, model_flight_count do
+        keys[#keys+1] = k
+    end
+
+    local model_summary_list = {}
+    log("calculate_model_summary_list()")
     m_tables.table_clear(model_summary_list)
-    for k, v in pairs(model_flight_count) do
-        --local inf = string.format("%-17s - %d flights", k, v)
+    for i = 1, #keys do
+        local k = keys[i]
+        local v = model_flight_count[k]
+        local inf = string.format("===================== %-17s - %d flights", k, v)
         -- local inf = string.format("%03d - %s", v, k)
-        -- log("model_flight_count: %s", inf)
+        log("model_flight_count: %s", inf)
         model_summary_list[#model_summary_list +1] = {k, v}
     end
+
     return model_summary_list
 end
 
@@ -285,7 +298,7 @@ local function state_FLIGHTS_COUNT_INIT(event, touchState)
         font=FS.FONT_8,
         header={"Model", "Flights Count"},
         colX={20, 250},
-        lines=model_summary_list
+        lines=model_summary_list,
     })
 
     state = STATE.FLIGHTS_COUNT
