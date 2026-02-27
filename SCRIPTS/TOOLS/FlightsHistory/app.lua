@@ -19,12 +19,15 @@ local M = {}
 
 -- This history of flights
 -- Author: Offer Shmuely
--- Date: 2023-2025
+-- Date: 2023-2026
 
 local script_folder = "/SCRIPTS/TOOLS/FlightsHistory"
 local filter_model_name
 local filter_model_name_idx = 1
 local model_name_list = { "-- all --" }
+
+local lvSCALE = lvgl.LCD_SCALE or 1
+local is800 = (LCD_W==800)
 
 -- state machine
 local STATE = {
@@ -109,17 +112,8 @@ end
 
 local function state_READ_HIST_INIT(event, touchState)
     -- lvgl.clear()
-    -- lvgl.build({
-    --     -- draw top-bar
-    --     {type="rectangle", x=0, y=0, w=LCD_W, h=20, color=TITLE_BGCOLOR, filled=true},
-    --     {type="label", x=160, y=1, text="Flight History Viewer", color=WHITE, font=FS.FONT_6},
-    --     {type="label", x=440, y=1, text="v" .. app_ver, color=WHITE, font=FS.FONT_6},
-    --     -- {type="image", x=0, y=0, w=LCD_W, h=LCD_H, file=script_folder.."/bg2.png"},
-    --     -- {type="label", x=10, y=25, text="Models Flight Count...", font=BOLD},
-    -- })
-
     lvgl.build({
-        {type="label", x=20, y=200, text="Reading data...", color=ORANGE, font=FS.FONT_12 + BOLD}
+        {type="label", x=20*lvSCALE, y=200*lvSCALE, text="Reading data...", color=ORANGE, font=FS.FONT_12 + BOLD}
     })
 
     state = STATE.READ_HIST
@@ -161,16 +155,16 @@ local function state_SHOW_FLIGHTS_HIST_INIT(event, touchState)
     lvgl.build({
         -- draw top-bar
         {type="rectangle", x=0, y=0, w=LCD_W, h=LCD_H, color=BLACK, filled=true},
-        {type="rectangle", x=0, y=0, w=LCD_W, h=20, color=TITLE_BGCOLOR, filled=true},
-        {type="label", x=160, y=1, text="Flight History Viewer", color=WHITE, font=FS.FONT_6},
-        {type="label", x=440, y=1, text="v" .. app_ver, color=WHITE, font=FS.FONT_6},
+        {type="rectangle", x=0, y=0, w=LCD_W, h=20*lvSCALE, color=COLOR_THEME_SECONDARY1, filled=true},
+        {type="label", x=160*lvSCALE, y=1*lvSCALE, text="Flight History Viewer", color=WHITE, font=FS.FONT_6},
+        {type="label", x=LCD_W-40*lvSCALE, y=1*lvSCALE, text="v" .. app_ver, color=WHITE, font=FS.FONT_6},
         -- {type="image", x=0, y=0, w=LCD_W, h=LCD_H, file=script_folder.."/bg2.png"},
-        {type="label", x=10, y=25, text="All Flight...", font=BOLD, color=WHITE},
+        {type="label", x=10*lvSCALE, y=25*lvSCALE, text="All Flight...", font=BOLD, color=WHITE},
     })
 
     filter_model_name_idx = 1
     lvgl.build({
-        { type = "choice", x=150, y=25, w=LCD_W-10-150, h=27, title = "Craft",
+        { type="choice", x=150*lvSCALE, y=25*lvSCALE, w=LCD_W-(10+150)*lvSCALE, h=27*lvSCALE, title = "Craft",
             values = model_name_list,
             -- values = {"aaa", "bbb", "ccc", "ddd", "eee"},
             get = function() return filter_model_name_idx; end,
@@ -203,10 +197,10 @@ local function state_SHOW_FLIGHTS_HIST_INIT(event, touchState)
     end
 
     libGUIv4.newCtl.ctl_table(nil, "count-table", {
-        x=10, y=64, w=LCD_W-10, h=LCD_H-60,
+        x=10*lvSCALE, y=64*lvSCALE, w=LCD_W-10*lvSCALE, h=LCD_H-65*lvSCALE,
         font=FS.FONT_6,
         header={"Date", "Model", "Flights", "Duration"},
-        colX={20, 100, 340, 400},
+        colX={20*lvSCALE, 100*lvSCALE, 340*lvSCALE, 400*lvSCALE},
         lines=lines_csv,
         fIsLineVisible=is_visible_line,
         maxLines=50,
@@ -286,18 +280,18 @@ local function state_FLIGHTS_COUNT_INIT(event, touchState)
     lvgl.build({
         -- draw top-bar
         {type="rectangle", x=0, y=0, w=LCD_W, h=LCD_H, color=BLACK, filled=true},
-        {type="rectangle", x=0, y=0, w=LCD_W, h=20, color=TITLE_BGCOLOR, filled=true},
-        {type="label", x=160, y=1, text="Flight History Viewer", color=WHITE, font=FS.FONT_6},
-        {type="label", x=440, y=1, text="v" .. app_ver, color=WHITE, font=FS.FONT_6},
+        {type="rectangle", x=0, y=0, w=LCD_W, h=20*lvSCALE, color=COLOR_THEME_SECONDARY1, filled=true},
+        {type="label", x=160*lvSCALE, y=1, text="Flight History Viewer", color=WHITE, font=FS.FONT_6},
+        {type="label", x=LCD_W-40*lvSCALE, y=1, text="v" .. app_ver, color=WHITE, font=FS.FONT_6},
         -- {type="image", x=0, y=0, w=LCD_W, h=LCD_H, file=script_folder.."/bg2.png"},
-        {type="label", x=10, y=25, text="Flight Count...", font=BOLD, color=WHITE},
+        {type="label", x=10*lvSCALE, y=25*lvSCALE, text="Flight Count...", font=BOLD, color=WHITE},
     })
 
     libGUIv4.newCtl.ctl_table(nil, "count-table", {
-        x=20,y=50,w=480,h=272-50,
+        x=20*lvSCALE, y=50*lvSCALE, w=LCD_W-20*lvSCALE, h=LCD_H-50*lvSCALE,
         font=FS.FONT_8,
         header={"Model", "Flights Count"},
-        colX={20, 250},
+        colX={20*lvSCALE, 250*lvSCALE},
         lines=model_summary_list,
     })
 

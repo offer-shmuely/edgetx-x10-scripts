@@ -1,3 +1,4 @@
+-- TNS|Flights History|TNE
 ---- #########################################################################
 ---- #                                                                       #
 ---- # License GPLv3: https://www.gnu.org/licenses/gpl-3.0.html              #
@@ -15,8 +16,8 @@
 
 -- This script display the flights history as kept using the "Flights" widget
 -- Author: Offer Shmuely
--- Date: 2023-2025
-local app_ver = "1.8"
+-- Date: 2023-2026
+local app_ver = "1.9"
 
 -- to get help:
 -- change in lib_log.lua to "ENABLE_LOG_FILE=true"
@@ -33,7 +34,7 @@ local function my_load_script(file_name, ...)
     -- print(string.format("%s - loading, num args: %d", file_name, #{...}))
     return code_chunk(...)
 end
-
+print("Loading "..app_name.." ver: "..app_ver)
 local m_log =       my_load_script("lib_log",               app_name, "/SCRIPTS/TOOLS/"..app_name)
 local m_utils =     my_load_script("lib_utils",             m_log, app_name)
 local m_tables =    my_load_script("lib_tables",            m_log, app_name)

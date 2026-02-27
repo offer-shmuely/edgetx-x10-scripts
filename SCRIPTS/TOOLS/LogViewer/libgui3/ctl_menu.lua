@@ -60,6 +60,10 @@ function menu(panel, id, args, flags)
     function self.getSelected()
         return selected1
     end
+    function self.setSelected(id)
+        self.selected = id
+        selected1 = id
+    end
 
     function self.getSelectedText()
         local txt = self.items1[selected1]
@@ -88,12 +92,12 @@ function menu(panel, id, args, flags)
             local j = firstVisible + i
             local y = self.y + i * lh
 
-            panel.log('self.items1:');
+            -- panel.log('self.items1:');
             for k, v in ipairs(self.items1) do
                 panel.log("  %d: %s", k, v)
             end
 
-            panel.log("111 j:%d visibleCount:%d itemCount:%d", j, visibleCount, itemCount)
+            -- panel.log("111 j:%d visibleCount:%d itemCount:%d", j, visibleCount, itemCount)
             assert(self.items1)
             assert(self.items1[j])
             local x1 = panel._.align_w(self.x, self.w, flags)
@@ -125,13 +129,13 @@ function menu(panel, id, args, flags)
         end
 
         if event ~= 0 then
-            -- This hack is needed because killEvents does not seem to work
-            if killEvt then
-                killEvt = false
-                if event == EVT_VIRTUAL_ENTER then
-                    event = 0
-                end
-            end
+            -- -- This hack is needed because killEvents does not seem to work
+            -- if killEvt then
+            --     killEvt = false
+            --     if event == EVT_VIRTUAL_ENTER then
+            --         event = 0
+            --     end
+            -- end
 
             -- If we touch it, then start editing immediately
             if touchState then

@@ -1,3 +1,4 @@
+-- TNS|FrSky Gyro S6R S8R SR8+ SR10+|TNE
 ---- #########################################################################                                                                  #
 ---- # License GPLv2: http://www.gnu.org/licenses/gpl-2.0.html               #
 ---- #                                                                       #
@@ -88,7 +89,7 @@ end
 
 local function drawScreenTitle(title, page, pages)
     if (TEXT_SIZE == 0) then -- Big Screen
-        lcd.drawFilledRectangle(0, 0, LCD_W, 30, TITLE_BGCOLOR)
+        lcd.drawFilledRectangle(0, 0, LCD_W, 30, COLOR_THEME_SECONDARY1)
         lcd.drawText(10, 5, title, COLOR_THEME_PRIMARY2)
     else
         lcd.drawText(5, 1, title, TEXT_SIZE + BOLD)

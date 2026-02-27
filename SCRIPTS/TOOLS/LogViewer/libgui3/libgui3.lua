@@ -269,6 +269,9 @@ function M.newPanel(id, args)
     end
 
     function panel.drawText(x, y, text, flags, inversColor)
+        local panelName = panel.id or "--"
+        assert(text ~= nil, "text is nil, ".. panelName)
+        assert(type(text) == "string", "text must be string")
         x, y = panel.translate(x, y)
         -- local is_center_horz = bit32.btest(flags, CENTER)
         -- flags = bit32.bnot(flags, CENTER)

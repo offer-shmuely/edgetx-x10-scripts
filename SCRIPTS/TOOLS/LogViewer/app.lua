@@ -21,7 +21,7 @@ local M = {}
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
 -- Current Author: Offer Shmuely
 -- Date: 2023
-local app_ver = "1.17"
+local app_ver = "1.18"
 
 function M.getVer()
     return app_ver
@@ -342,7 +342,7 @@ end
 
 -- read log file list
 local function read_and_index_file_list()
-    --log("read_and_index_file_list(%d, %d)", log_file_list_raw_idx, #log_file_list_raw)
+    log("read_and_index_file_list(%d, %d)", log_file_list_raw_idx, #log_file_list_raw)
 
     if (#log_file_list_raw == 0) then
         log("read_and_index_file_list: init")
@@ -377,7 +377,7 @@ local function read_and_index_file_list()
 
             -- draw top-bar
             lcd.clear()
-            lcd.drawFilledRectangle(0, 0, LCD_W, 20, TITLE_BGCOLOR)
+            lcd.drawFilledRectangle(0, 0, LCD_W, 20, COLOR_THEME_SECONDARY1)
             lcd.drawBitmap(img_bg2, 0, 0)
             lcd.drawText(440, 1, "v" .. app_ver, WHITE + SMLSIZE)
 
@@ -423,17 +423,19 @@ local function read_and_index_file_list()
 end
 
 local function onLogFileChange(obj)
-    --m_tables.table_print("log_file_list_filtered", log_file_list_filtered)
+    m_tables.table_print("log_file_list_filtered", log_file_list_filtered)
+    log("onLogFileChange()")
 
     local i = obj.getSelected()
     filename = log_file_list_filtered[i]
     log("Selected file index: %d", i)
-    log("Selected file: %s", log_file_list_filtered[i])
+    log("Selected file: %s", filename)
     filename_idx = i
-    --log("filename: " .. filename)
+    log("onLogFileChange-done, filename: " .. filename)
 end
 
 local function onAccuracyChange(obj)
+    log("onAccuracyChange()")
     local i = obj.selected1
     local accuracy = i
     log("Selected accuracy: %s (%d)", accuracy_list[i], i)
@@ -473,13 +475,14 @@ local function filter_log_file_list(filter_model_name, filter_date, need_update)
             is_model_name_ok = (modelName == filter_model_name)
         end
 
-        local is_date_ok
-        if filter_date == nil or string.sub(filter_date, 1, 2) == "--" then
-            is_date_ok = true
-        else
-            local model_day = string.format("%s-%s-%s", year, month, day)
-            is_date_ok = (model_day == filter_date)
-        end
+        -- local is_date_ok
+        -- if filter_date == nil or string.sub(filter_date, 1, 2) == "--" then
+        --     is_date_ok = true
+        -- else
+        --     local model_day = string.format("%s-%s-%s", year, month, day)
+        --     is_date_ok = (model_day == filter_date)
+        -- end
+        local is_date_ok = true
 
         local is_duration_ok = true
         if log_file_info.total_seconds < min_log_sec_to_show then
@@ -518,8 +521,9 @@ local function filter_log_file_list(filter_model_name, filter_date, need_update)
 
     -- update the log combo to first
     if need_update == true then
+        filename_idx = 1
+        ddLogFile.setSelected(1)
         onLogFileChange(ddLogFile)
-        ddLogFile.selected1 = 1
     end
 end
 
@@ -631,6 +635,7 @@ local function state_SELECT_FILE_init(event, touchState)
         ddModel = ctx1.newControl.ctl_dropdown(ctx1, nil, {x=90, y=55, w=380, h=24,
             items=model_name_list, selected=1,
             callback=function(obj)
+                log("onModelChange()")
                 local i = obj.selected1
                 filter_model_name = model_name_list[i]
                 filter_model_name_idx = i
@@ -639,29 +644,36 @@ local function state_SELECT_FILE_init(event, touchState)
             end
         })
 
-        --log("setting date filter...")
-        ctx1.newControl.ctl_label(ctx1, nil, {x=20, y=90, text="Date"})
-        ctx1.newControl.ctl_dropdown(ctx1, nil, {x=90, y=90, w=380, h=24,
-            items=date_list, selected=1,
-            callback=function(obj)
-                local i = obj.selected1
-                filter_date = date_list[i]
-                filter_date_idx = i
-                log("Selected filter_date: " .. filter_date)
-                filter_log_file_list(filter_model_name, filter_date, true)
-            end
-        })
+        -- --log("setting date filter...")
+        -- ctx1.newControl.ctl_label(ctx1, nil, {x=20, y=90, text="Date"})
+        -- ctx1.newControl.ctl_dropdown(ctx1, nil, {x=90, y=90, w=380, h=24,
+        --     items=date_list, selected=1,
+        --     callback=function(obj)
+        --         log("onDateChange()")
+
+        --         local i = obj.selected1
+        --         filter_date = date_list[i]
+        --         filter_date_idx = i
+        --         log("Selected filter_date: " .. filter_date)
+        --         filter_log_file_list(filter_model_name, filter_date, true)
+        --     end
+        -- })
 
         log("setting file combo...")
-        ctx1.newControl.ctl_label(ctx1, nil, {x=20, y=125, text="Log file"})
-        ddLogFile = ctx1.newControl.ctl_dropdown(ctx1, nil, {x=90,y=125,w=380,h=24,
-            items=log_file_list_filtered2, selected=filename_idx,
+        ctx1.newControl.ctl_label(ctx1, nil, {x=20, y=90, text="Log file"})
+        ddLogFile = ctx1.newControl.ctl_dropdown(ctx1, nil, {x=90,y=90,w=380,h=24,
+            items=log_file_list_filtered2,
+            selected=filename_idx,
             callback=onLogFileChange
         })
         onLogFileChange(ddLogFile)
 
-        ctx1.newControl.ctl_label(ctx1, nil, {x=20, y=160, text="Accuracy"})
-        dd4 = ctx1.newControl.ctl_dropdown(ctx1, nil, {x=90, y=160, w=380, h=24, items=accuracy_list, selected=1, callback=onAccuracyChange})
+        ctx1.newControl.ctl_label(ctx1, nil, {x=20, y=125, text="Accuracy"})
+        dd4 = ctx1.newControl.ctl_dropdown(ctx1, nil, {x=90, y=125, w=380, h=24,
+            items=accuracy_list,
+            selected=1,
+            callback=onAccuracyChange
+        })
         onAccuracyChange(dd4)
 
     end
@@ -1031,7 +1043,7 @@ local function drawMain()
         lcd.drawBitmap(img_bg3, 0, 0)
     else
         -- draw top-bar
-        lcd.drawFilledRectangle(0, 0, LCD_W, 20, TITLE_BGCOLOR)
+        lcd.drawFilledRectangle(0, 0, LCD_W, 20, COLOR_THEME_SECONDARY1)
         lcd.drawBitmap(img_bg2, 0, 0)
     end
     lcd.drawText(440, 1, "v" .. app_ver, WHITE + SMLSIZE)
