@@ -5,6 +5,8 @@ local Product   = {
         [76]= {name="Archer+ SR12+", imgPrefix="ap_sr12p"},
         [79]= {name="SR6 Mini",      imgPrefix="ap_sr6_mini"},
         [80]= {name="SR6 Mini E",    imgPrefix="ap_sr6_mini"},
+        [81]= {name="SR6BL15A",      imgPrefix="ap_sr8"},      -- added by: ChrisOhara
+        [82]= {name="SR6Lite",       imgPrefix="ap_sr8"},      -- added by: ChrisOhara
 }
 
 function Telemetry.telemetryRead(field)
@@ -28,13 +30,13 @@ end
 
 function Telemetry.parseValue(value)
     local D3,D2,D1,fieldId
-  
-    fieldId = bit32.band(value,0xFF) 
+
+    fieldId = bit32.band(value,0xFF)
     D1      = bit32.band(bit32.rshift(value,8),0xFF)
     D2      = bit32.band(bit32.rshift(value,16),0xFF)
     D3      = bit32.band(bit32.rshift(value,24),0xFF)
-  
-    return fieldId, D1, D2, D3  
+
+    return fieldId, D1, D2, D3
 end
 
 
