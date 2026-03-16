@@ -5,20 +5,20 @@ M.m_log = m_log
 M.app_name = app_name
 
 
-function M.tprint(t, s)
+function M.print2(t, prefix)
     for k, v in pairs(t) do
-        local kfmt = '["' .. tostring(k) .. '"]'
+        local kfmt = string.format('["%s"]', tostring(k))
         if type(k) ~= 'string' then
-            kfmt = '[' .. k .. ']'
+            kfmt = string.format('[%s]', k)
         end
-        local vfmt = '"' .. tostring(v) .. '"'
+        local vfmt = string.format('"%s"', tostring(v))
         if type(v) == 'table' then
-            M.tprint(v, (s or '') .. kfmt)
+            M.print2(v, (prefix or '') .. kfmt)
         else
             if type(v) ~= 'string' then
                 vfmt = tostring(v)
             end
-            M.m_log.info(type(t) .. (s or '') .. kfmt .. ' = ' .. vfmt)
+            M.m_log.info(string.format("%s: (type:%s) %s=%s", (prefix or ''), type(t), kfmt, vfmt))
         end
     end
 end
@@ -30,19 +30,21 @@ function M.table_clear(tbl)
     end
 end
 
-function M.table_print(prefix, tbl)
+function M.print(tbl, prefix)
     M.m_log.info(">>> table_print (%s)", prefix)
     for i = 1, #tbl, 1 do
         local val = tbl[i]
-        if type(val) ~= "table" then
-            M.m_log.info(string.format("%d. %s: %s", i, prefix, val))
-        else
+        if type(val) == "table" then
             local t_val = val
             M.m_log.info("-++++------------ %d %s", #val, type(t_val))
             for j = 1, #t_val, 1 do
                 local val = t_val[j]
-                 M.m_log.info(string.format("%d. %s: %s", i, prefix, val))
+                 M.m_log.info(string.format('%s: [%d]="%s"', prefix, i, val))
             end
+        elseif type(val) == "string" then
+            M.m_log.info(string.format('%s: [%d]= "%s"', prefix, i, val))
+        else
+            M.m_log.info(string.format('%s: [%d]= "%s"', prefix, i, val))
         end
     end
     M.m_log.info("<<< table_print end (%s) ", prefix)

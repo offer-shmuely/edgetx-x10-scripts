@@ -99,7 +99,7 @@ function M.indexRead()
         --m_log.info("files_on_disk fn: %s", fn)
         files_on_disk[fn] = "OK"
     end
-    m_tables.table_print("files_on_disk", files_on_disk)
+    m_tables.print(files_on_disk, "files_on_disk")
 
     -- get header line
     local headerLine = string.sub(data1, 1, index)
@@ -111,7 +111,6 @@ function M.indexRead()
     --M.indexPrint("indexRead-should-be-empty")
     local is_index_have_deleted_files = false
     for line in string.gmatch(data2, "([^\n]+)\n") do
-
         if string.sub(line, 1, 1) ~= "#" then
             --M.m_log.info("indexRead: index-line: %s", line)
             local values = m_utils.split(line)
