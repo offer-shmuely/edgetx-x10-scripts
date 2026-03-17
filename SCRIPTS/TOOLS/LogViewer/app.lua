@@ -35,21 +35,14 @@ local M = {}
 -- run the script ...
 -- send me the log file that will be created on: /SCRIPTS/TOOLS/LogViewer/app.log
 
-
-local app_ver = "2.0"
+local app_ver = "2.1"
 
 local lvSCALE = lvgl.LCD_SCALE or 1
 local is800 = (LCD_W==800)
 
 --function cache
-local math_floor = math.floor
-local math_fmod = math.fmod
 local string_gmatch = string.gmatch
 local string_gsub = string.gsub
-local string_len = string.len
-local string_sub = string.sub
-local string_char = string.char
-local string_byte = string.byte
 
 local heap = 2048
 local hFile
@@ -62,11 +55,8 @@ local log_file_list_fullinfo = {}
 local log_file_list_friendly_names = {}
 local filter_model_name
 local filter_model_name_idx = 1
-local filter_date
-local filter_date_idx = 1
 local model_name_list = { "-- all --" }
 local date_list = { "-- all --" }
-local ddModel = nil
 local bddLogFile2 = nil
 
 local INDEX_TYPE = {ALL=1, LAST_10=2, TODAY=3, LAST_ONE=4}
@@ -289,7 +279,7 @@ local function create_log_file_list()
             table.insert(log_file_list_fullinfo, log_file_info)
             table.insert(log_file_list_friendly_names, log_file_info.freindly_name)
         else
-            log("create_log_file_list: [%s] - FILTERED-OUT (filters:%s,%s) (is_duration_ok:%s) (have_data_ok:%s)", log_file_info.file_name, filter_model_name, filter_date, is_duration_ok, is_have_data_ok)
+            log("create_log_file_list: [%s] - FILTERED-OUT (filters:%s) (is_duration_ok:%s) (have_data_ok:%s)", log_file_info.file_name, filter_model_name, is_duration_ok, is_have_data_ok)
         end
     end
 
@@ -305,8 +295,8 @@ local function create_log_file_list()
     -- assert(loadScript("/WIDGETS/_libs/table_explorer.lua"))().print(log_file_list_fullinfo, "log_file_list_fullinfo")
 end
 
-local function filter_log_file_list(filter_model_name, filter_date, need_update)
-    log("need to filter by: [%s] [%s] [%s]", filter_model_name, filter_date, need_update)
+local function filter_log_file_list(filter_model_name, need_update)
+    log("need to filter by: [%s] [%s]", filter_model_name, need_update)
 
     local have_visibles = false
     log_file_list_fullinfo[1].is_visible = false
@@ -322,20 +312,12 @@ local function filter_log_file_list(filter_model_name, filter_date, need_update)
             is_model_name_needed = (modelName == filter_model_name)
         end
 
-        local is_date_needed
-        if filter_date == nil or string.sub(filter_date, 1, 2) == "--" then
-            is_date_needed = true
-        else
-            local model_day = string.format("%s-%s-%s", year, month, day)
-            is_date_needed = (model_day == filter_date)
-        end
-
-        if is_model_name_needed and is_date_needed and log_file_info.file_name~="---" then
-            log("filter_log_file_list: [%s] - OK (%s,%s)", log_file_info.file_name, filter_model_name, filter_date)
+        if is_model_name_needed and log_file_info.file_name~="---" then
+            log("filter_log_file_list: [%s] - OK (%s)", log_file_info.file_name, filter_model_name)
             log_file_info.is_visible = true
             have_visibles = true
         else
-            log("filter_log_file_list: [%s] - FILTERED-OUT (filters:%s,%s) (model_name_ok:%s,date_ok:%s)", log_file_info.file_name, filter_model_name, filter_date, is_model_name_needed, is_date_needed)
+            log("filter_log_file_list: [%s] - FILTERED-OUT (filters:%s) (model_name_ok:%s)", log_file_info.file_name, filter_model_name, is_model_name_needed)
             log_file_info.is_visible = false
         end
 
@@ -352,7 +334,8 @@ local function state_SPLASH_INIT(event, touchState)
     lvgl.clear()
 
     lvgl.build({
-        {type="image", x=0, y=0, w=LCD_W, h=LCD_H, file=APP_DIR.."/img/bg3.png"},
+        {type="rectangle", x=0, y=0, w=LCD_W, h=LCD_H, color=BLACK, filled=true},
+        {type="image", x=0, y=0, w=LCD_W, h=LCD_H, file=APP_DIR.."/img/bg1.png"},
     })
 
     state = STATE.SPLASH
@@ -388,7 +371,7 @@ local function state_SPLASH(event, touchState)
     --log('elapsed: %d (t.durationMili: %d)', elapsed, splash_start_time)
     local elapsedMili = elapsed * 10;
     -- was 1500, but most the time will go anyway from the load of the scripts
-    if (elapsedMili >= 500) then
+    if (elapsedMili >= 2500) then
         state = STATE.SELECT_INDEX_TYPE_INIT
     end
 
@@ -401,44 +384,32 @@ local function state_SELECT_INDEX_TYPE_INIT(event, touchState)
 
     local mainBox = build_ui_topbar()
 
-    -- lvgl.build({
-    --     {   type="file",
-    --         x=40, y=180,
-    --         w=100,
-    --         title="flight logs",
-    --         -- h=LCD_H,
-    --         folder="/LOGS",
-    --         extension=".csv",
-    --         hideExtension=true,
-    --     },
-    -- })
-
     mainBox:build({
         {type="label", x=LCD_W/2-100*lvSCALE, y=1*lvSCALE, text="Flight History Viewer", color=WHITE, font=FS.FONT_6},
         {type="label", x=10*lvSCALE, y=30*lvSCALE, text="Indexing selection"},
 
-        {type="button", x=90*lvSCALE, y=60*lvSCALE, w=320*lvSCALE, h=45*lvSCALE, text="Last flight (fast)", press=
+        {type="button", x=90*lvSCALE, y=60*lvSCALE, w=320*lvSCALE, h=45*lvSCALE, text="Last Flight (fast)", press=
             function()
                 log("onButtonIndexTypeLastFlight")
                 index_type = INDEX_TYPE.LAST_ONE
                 state = STATE.INDEX_FILES_INIT
             end
         },
-        {type="button", x=90*lvSCALE, y=110*lvSCALE, w=320*lvSCALE, h=45*lvSCALE, text="Last Day", press=
+        {type="button", x=90*lvSCALE, y=110*lvSCALE, w=320*lvSCALE, h=45*lvSCALE, text="Index Last Day", press=
             function()
                 log("onButtonIndexTypeToday")
                 index_type = INDEX_TYPE.TODAY;
                 state = STATE.INDEX_FILES_INIT;
             end
         },
-        {type="button", x=90*lvSCALE, y=160*lvSCALE, w=320*lvSCALE, h=45*lvSCALE, text="Last 10 Flights", press=
+        {type="button", x=90*lvSCALE, y=160*lvSCALE, w=320*lvSCALE, h=45*lvSCALE, text="Index Last 10 Flights", press=
             function()
                 log("onButtonIndexTypeLast10Flights")
                 index_type = INDEX_TYPE.LAST_10
                 state = STATE.INDEX_FILES_INIT;
             end
         },
-        {type="button", x=90*lvSCALE, y= 210*lvSCALE, w=320*lvSCALE, h=45*lvSCALE, text="All Flights (slow)", press=
+        {type="button", x=90*lvSCALE, y= 210*lvSCALE, w=320*lvSCALE, h=45*lvSCALE, text="Index All Flights (slow)", press=
             function()
                 log("onButtonIndexTypeAll")
                 index_type = INDEX_TYPE.ALL
@@ -501,7 +472,7 @@ local function state_INDEX_FILES(event, touchState)
         m_index_file.indexInit()
         log_file_list_raw = get_log_files_list()
         log_file_list_raw_idx = 0
-        m_index_file.indexRead(log_file_list_raw)
+        m_index_file.indexRead()
     end
 
     for i = 1, 10, 1 do
@@ -547,7 +518,7 @@ end
 
 local function state_SELECT_FILE_INIT(event, touchState)
     create_log_file_list()
-    filter_log_file_list(nil, nil, false)
+    filter_log_file_list(nil, false)
 
     -- if select_file_gui_init == false then
         -- select_file_gui_init = true
@@ -563,6 +534,7 @@ local function state_SELECT_FILE_INIT(event, touchState)
             children={
                 { type="label", x=5*lvSCALE, y=0, text="Model" },
                 { type = "choice", x=90*lvSCALE, w=380*lvSCALE, title = "Model",
+                    popupWidth = 300*lvSCALE,
                     values = model_name_list,
                     get = function() return filter_model_name_idx; end,
                     set = function(i)
@@ -571,46 +543,25 @@ local function state_SELECT_FILE_INIT(event, touchState)
                         filter_model_name = model_name_list[i]
                         filter_model_name_idx = i
                         log("Selected model-name: " .. filter_model_name)
-                        filter_log_file_list(filter_model_name, filter_date, true)
+                        filter_log_file_list(filter_model_name, true)
                     end ,
                 },
             }
         }
     })
 
-    mainBox:build({
-        { type="setting", x=0, y=100*lvSCALE,
-            children={
-                { type="label", x=5*lvSCALE, y=0, text="Date" },
-                { type = "choice", x=90*lvSCALE, w=380*lvSCALE, title = "Date",
-                    values = date_list,
-                    get = function() return filter_date_idx; end,
-                    set = function(i)
-                        log("Selected filter_date: %d", i)
-                        log("Selected filter_date: %s", date_list[i])
-                        filter_date = date_list[i]
-                        filter_date_idx = i
-                        log("Selected filter_date: " .. filter_date)
-                        filter_log_file_list(filter_model_name, filter_date, true)
-
-                    end ,
-                },
-            }
-        },
-    })
-
     -- file
-    local st = lvgl.setting({x=0, y=140*lvSCALE})
-    st:label({ x=5*lvSCALE, y=0, text="Log file" })
+    local st = lvgl.setting({x=0, y=100*lvSCALE})
+    st:label({ x=5*lvSCALE, y=0, text="Logfile" })
     bddLogFile2 = st:box({ x=90*lvSCALE, w=380*lvSCALE})
-    bddLogFile2:choice({x=0, w=380*lvSCALE, title = "Log file",
+    bddLogFile2:choice({x=0, w=380*lvSCALE, title = "Logfile",
+        popupWidth = 400*lvSCALE,
         values = log_file_list_friendly_names,
         get = function()
             -- log("filename_idx: %s, %s", filename_idx, log_file_list_fullinfo[filename_idx].file_name)
             return filename_idx
         end,
         set = function(i)
-            -- filename_idx = i
             onLogFileChange(i)
         end,
         filter=function(n)
@@ -623,15 +574,16 @@ local function state_SELECT_FILE_INIT(event, touchState)
 
     -- Accuracy
     lvgl.build({
-        { type="setting", x=0, y=180*lvSCALE,
+        { type="setting", x=0, y=140*lvSCALE,
             children={
                 { type="label", x=5*lvSCALE, y=0, text="Accuracy" },
                 { type = "choice", x=90*lvSCALE, w=380*lvSCALE, title = "Accuracy",
+                    popupWidth = 300*lvSCALE,
                     values = {
-                        "1/1 (read every line)",
+                        "1/1 (accurate, read every line)",
                         "1/2 (every 2nd line)",
                         "1/5 (every 5th line)",
-                        "1/10 (every 10th line)"
+                        "1/10 (fast, every 10th line)"
                     },
                     get = function() return accuracy_idx end,
                     set = function(i)
@@ -645,7 +597,7 @@ local function state_SELECT_FILE_INIT(event, touchState)
     accuracy_idx = 1
     onAccuracyChange(1)
 
-    filter_log_file_list(filter_model_name, filter_date, true)
+    filter_log_file_list(filter_model_name, true)
 
     state = STATE.SELECT_FILE
     return 0
@@ -869,16 +821,16 @@ local function state_SELECT_SENSORS_INIT()
     local preset_w = LCD_W/2 + 20*lvSCALE
 
     lvgl.label({x=LCD_W-preset_w-10*lvSCALE, y=25*lvSCALE, text="Presets...", font=BOLD})
+    local b = lvgl.rectangle({x=LCD_W-preset_w-5*lvSCALE, y=50*lvSCALE, w=preset_w, h=LCD_H - 50*lvSCALE, filled=false, rounded=6, scrollDir=lvgl.SCROLL_VER})
 
-
-    -- local b = lvgl.rectangle({x=LCD_W-preset_w-10*lvSCALE, y=25*lvSCALE, w=preset_w, h=(30+#presets*60)*lvSCALE, filled=false, rounded=6, scrollDir=lvgl.SCROLL_VER,
-    local b = lvgl.rectangle({x=LCD_W-preset_w-5*lvSCALE, y=50*lvSCALE, w=preset_w, h=LCD_H - 50*lvSCALE, filled=false, rounded=6, scrollDir=lvgl.SCROLL_VER,
-        -- children={
-        --      {type="label", x=10*lvSCALE, y=5*lvSCALE, text="Presets...", font=BOLD},
-        -- }
-    })
-
-    local fields_presets = loadScript(APP_DIR .. "/presets.lua", "btd")()
+    local user_presets_path = APP_DIR .. "/presets_user.lua"
+    local fields_presets
+    if io.open(user_presets_path, "r") ~= nil then
+        log("loading user presets from: %s", user_presets_path)
+        fields_presets = loadScript(user_presets_path, "btd")()
+    else
+        fields_presets = loadScript(APP_DIR .. "/presets.lua", "btd")()
+    end
 
     for i = 1, #fields_presets do
         local p = fields_presets[i]

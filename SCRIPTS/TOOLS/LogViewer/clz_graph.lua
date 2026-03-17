@@ -14,13 +14,6 @@ local FS={FONT_38=XXLSIZE,FONT_16=DBLSIZE,FONT_12=MIDSIZE,FONT_8=0,FONT_6=SMLSIZ
 local lvSCALE = lvgl.LCD_SCALE or 1
 local is800 = (LCD_W==800)
 
-local GRAPH_MODE = {
-    CURSOR = 0,
-    ZOOM = 1,
-    SCROLL = 2,
-    GRAPH_MINMAX = 3
-}
-
 local M = {
     kind="clz_graph",
     m_log = m_log,
@@ -32,21 +25,20 @@ local M = {
 }
 
 local bGraph
--- local cursor = 50
--- local valsNum = 0 -- number of values per line
 local graphTimeBase = 0
 local sens_data = {}
-local center_delay_start = nil
-local graphMode = GRAPH_MODE.CURSOR
-local graphMinMaxEditorIndex = 0
 local filename = "---"
 local show_dbg = false
 local show_settings = false
+local scale_info = {
+    w = 40,
+    label = "?"
+}
 
 local graphConfig = {
     x_scrool = 0,
     y_start = 40,
-    y_end = is800 and 440 or 240,
+    y_end = is800 and 430 or 230,
     xStep = 1,
     zoomLevel = 30,
     height = is800 and 400 or 200,
@@ -69,9 +61,7 @@ local graphConfigSens = {
 
 local cursor_data = {
     cursor_x = LCD_W / 2,
-    cursor_y = 0,
     cursor_time = 0,
-    cursor_value = 0,
     vals = {
         {x1 = 0,y1 = 0,v_txt = "---", txt_w = 0},
         {x1 = 0,y1 = 0,v_txt = "---", txt_w = 0},
@@ -85,7 +75,7 @@ local function log(fmt, ...)
 end
 
 function M.init(graphTimeBase1, sens1, sens2, sens3, sens4, filename1)
-    log("init()")
+    log("init(graphTimeBase1: %s)", graphTimeBase1)
     graphTimeBase = graphTimeBase1
     filename = filename1
     sens_data = { sens1, sens2, sens3, sens4 }
@@ -117,63 +107,9 @@ local function toDuration1(totalSeconds)
 end
 
 local function calc_graph_params()
-    -- viewScale = valsNum / 479
-    -- viewStart = math.floor(graphStart / viewScale)
-    -- viewEnd = math.floor((graphStart + graphSize) / viewScale)
-
     local minStep = 0.3
     local maxStep = 10
     graphConfig.xStep = minStep + (graphConfig.zoomLevel - 1) * (maxStep - minStep) / 99
-end
-
-local function drawGraph_status_line_values(sensIdx)
-    local curr_status_txt_x = 50
-
-    if sens_data[sensIdx].isUsedAndReady() == false then
-        return
-    end
-
-    local sens_data_info = sens_data[sensIdx]
-
-    -- if sens_data_info.line_points[cursor] == nil then
-    --     return
-    -- end
-    -- cursor values & status line values
-    -- status line values
-    -- local status_txt = sens_data_info.sensorName .. "=" .. sens_data_info.points[cursor] .. sens_data_info.unit
-    -- local status_txt_w, status_txt_h = lcd.sizeText(status_txt)
-    -- lcd.drawText(curr_status_txt_x, graphConfigSens[sensIdx].valy, status_txt, CUSTOM_COLOR)
-    -- curr_status_txt_x = curr_status_txt_x + status_txt_w + 10
-end
-
-local function drawGraph_min_max(sensIdx)
-    -- local skip = graphSize / 101
-    if sens_data[sensIdx].isUsedAndReady() == false then
-        return
-    end
-
-    local sens_data_info = sens_data[sensIdx]
-
-    -- -- draw min/max
-    -- local minPos = math.floor((sens_data_info.minpos + 1 - graphStart) / skip)
-    -- local maxPos = math.floor((sens_data_info.maxpos + 1 - graphStart) / skip)
-    -- minPos = math.min(math.max(minPos, 0), 100)
-    -- maxPos = math.min(math.max(maxPos, 0), 100)
-
-    -- local x = graphConfig.x_start + (minPos * xStep)
-    -- lcd.drawLine(x, 240, x, 250, SOLID, CUSTOM_COLOR)
-
-    -- local x = graphConfig.x_start + (maxPos * xStep)
-    -- lcd.drawLine(x, 30, x, graphConfig.y_start, SOLID, CUSTOM_COLOR)
-
-    -- -- draw max
-    -- lcd.drawFilledRectangle(graphConfigSens[sensIdx].maxx - 5, graphConfigSens[sensIdx].maxy, 35, 14, GREY, 5)
-    -- lcd.drawText(graphConfigSens[sensIdx].maxx, graphConfigSens[sensIdx].maxy, sens_data_info.max, FS.FONT_6 + CUSTOM_COLOR)
-
-    -- -- draw min
-    -- lcd.drawFilledRectangle(graphConfigSens[sensIdx].minx - 5, graphConfigSens[sensIdx].miny, 35, 14, GREY, 5)
-    -- lcd.drawText(graphConfigSens[sensIdx].minx, graphConfigSens[sensIdx].miny, sens_data_info.min, FS.FONT_6 + CUSTOM_COLOR)
-
 end
 
 local function calc_graph_cursor()
@@ -216,41 +152,32 @@ local function calc_graph_cursor()
     -- table_explorer.print(cursor_data, "cursor_data")
 end
 
-local function drawGraph_min_max_editor()
-    -- min/max editor
-    for sensIdx = 1, 4, 1 do
-        if sens_data[sensIdx].isUsedAndReady() == true then
-            local sens_data_info = sens_data[sensIdx]
-
-            -- min/max editor
-            if graphMode ~= GRAPH_MODE.MINMAX then
-                goto continue -- poor man continue
-            end
-
-            if ((graphMinMaxEditorIndex == (sensIdx - 1) * 2) or (graphMinMaxEditorIndex == ((sensIdx - 1) * 2) + 1)) then
-                local min_max_prefix
-                local txt
-                if graphMinMaxEditorIndex == (sensIdx - 1) * 2 then
-                    min_max_prefix = "Max"
-                    txt = string.format("%d %s", sens_data_info.max, sens_data_info.unit)
-                else
-                    txt = string.format("%d %s", sens_data_info.min, sens_data_info.unit)
-                    min_max_prefix = "Min"
-                end
-
-                local w, h = lcd.sizeText(txt, FS.FONT_12 + BOLD)
-                w = math.max(w + 10, 170)
-                local edt_x = 150
-                local edt_y = 100
-                lcd.drawFilledRectangle(edt_x, edt_y, w + 4, h + 30, GREY, 2)
-                lcd.drawRectangle(edt_x, edt_y, w + 4, h + 30, GREY, 0)
-
-                lcd.drawText(edt_x + 5, edt_y + 5, string.format("%s - %s", sens_data_info.sensorName, min_max_prefix), BOLD + CUSTOM_COLOR)
-                lcd.drawText(edt_x + 5, edt_y + 25, txt, FS.FONT_12 + BOLD + CUSTOM_COLOR)
-            end
-        end
-        :: continue ::
+local function calculate_scale_info()
+    local max_w = math.floor(LCD_W / 3)
+    local px_per_sec = graphConfig.xStep * graphTimeBase
+    if px_per_sec <= 0 then
+        scale_info.w = 40 * lvSCALE
+        scale_info.label = "?"
+        return
     end
+    local nice_durations = {5, 10, 15, 20, 30, 60, 120, 180, 300, 600, 900, 1200, 1800, 3600}
+    local chosen_sec = nice_durations[1]
+    local chosen_w = math.floor(px_per_sec * chosen_sec)
+    for i = 1, #nice_durations do
+        local w = math.floor(px_per_sec * nice_durations[i])
+        if w <= max_w then
+            chosen_sec = nice_durations[i]
+            chosen_w = w
+        else
+            break
+        end
+    end
+    if chosen_sec < 60 then
+        scale_info.label = string.format("%d sec", chosen_sec)
+    else
+        scale_info.label = string.format("%d min", chosen_sec / 60)
+    end
+    scale_info.w = math.max(chosen_w, 5 * lvSCALE)
 end
 
 local function recalculateGraph()
@@ -258,27 +185,12 @@ local function recalculateGraph()
     calc_graph_params()
 
     for sensIdx = 1, 4, 1 do
-        -- sens_data[sensIdx].clearLinePoints()
         sens_data[sensIdx].calc_graph_line(graphConfig) -- include clearLinePoints
-        drawGraph_status_line_values(sensIdx)
-        drawGraph_min_max(sensIdx)
-        drawGraph_min_max_editor(sensIdx)
     end
     calc_graph_cursor()
+    calculate_scale_info()
 
     graphConfig.needReLayout = false
-end
-
-local function run_GRAPH_adjust_coursor(amount)
-    cursor_data.cursor_x = cursor_data.cursor_x + math.floor(amount)
-    if cursor_data.cursor_x > LCD_W*0.8 then
-        cursor_data.cursor_x = LCD_W*0.8
-    elseif cursor_data.cursor_x < 0 then
-        cursor_data.cursor_x = 0
-    end
-
-    -- log("Cursor move: cursor_x: %d ", cursor_data.cursor_x)
-    calc_graph_cursor()
 end
 
 local function run_GRAPH_adjust_zoom(amount)
@@ -322,13 +234,13 @@ function M.state_SHOW_GRAPH_INIT()
     -- lvgl.image({x=0, y=0, w=LCD_W, h=LCD_H, file=APP_DIR.."/img/bg3.png", scrollDir=lvgl.SCROLL_OFF})
 
     -- header
-    local bHeader=lvgl.rectangle({x= 0, y=0, w=LCD_W, h=header_h, color=GREY, filled=true,
+    lvgl.rectangle({x= 0, y=0, w=LCD_W, h=header_h, color=GREY, filled=true,
         children={
             -- filename
             {type="label", x=10*lvSCALE, y=7*lvSCALE, text=function() return string.format("/LOGS/%s", filename or "---") end, color=WHITE, font=FS.FONT_6}, --, visible=function() return filename~=nil end},
 
             -- controls
-            {type="button", x=LCD_W-70*lvSCALE,  y=2*lvSCALE, h=30*lvSCALE, text="Setting", color=BLACK,
+            {type="button", x=LCD_W-70*lvSCALE,  y=2*lvSCALE, h=33*lvSCALE, text="Setting", color=BLACK,
                 press=function()
                     show_settings = not show_settings
                     log("settings button pressed: %s, show_settings: %s",i, show_settings)
@@ -337,19 +249,19 @@ function M.state_SHOW_GRAPH_INIT()
             },
             -- {type="button", x=LCD_W-120*lvSCALE, y=2*lvSCALE, h=30*lvSCALE, text="Info", color=BLACK, press=function() log("info button pressed") return 0 end},
 
-            {type="button", x=LCD_W-210*lvSCALE, y=2*lvSCALE, h=30*lvSCALE, text="<", color=BLACK,
+            {type="button", x=LCD_W-220*lvSCALE, y=2*lvSCALE, h=33*lvSCALE, text=" < ", color=BLACK,
                 press=function()
                     cursor_data.cursor_x = 10*lvSCALE
                     calc_graph_cursor()
                 end
             },
-            {type="button", x=LCD_W-185*lvSCALE, y=2*lvSCALE, h=30*lvSCALE, text="  |  ", color=BLACK,
+            {type="button", x=LCD_W-185*lvSCALE, y=2*lvSCALE, h=33*lvSCALE, text="  |  ", color=BLACK,
                 press=function()
                     cursor_data.cursor_x = LCD_W/2
                     calc_graph_cursor()
                 end
             },
-            {type="button", x=LCD_W-150*lvSCALE, y=2*lvSCALE, h=30*lvSCALE, text=">", color=BLACK,
+            {type="button", x=LCD_W-145*lvSCALE, y=2*lvSCALE, h=33*lvSCALE, text=" > ", color=BLACK,
                 press=function()
                     cursor_data.cursor_x = LCD_W*0.85
                     calc_graph_cursor()
@@ -378,7 +290,9 @@ function M.state_SHOW_GRAPH_INIT()
 
     -- cursor line
     local y_c_line = 20*lvSCALE
-    lvgl.vline({x=cursor_data.cursor_x, y=gArea_y+y_c_line, w=1*lvSCALE, h=gArea_h-y_c_line-20*lvSCALE, dashGap=5, dashWidth=5, color=WHITE})
+    lvgl.vline({w=1*lvSCALE, h=gArea_h-y_c_line-20*lvSCALE, dashGap=5, dashWidth=5, color=WHITE,
+        pos=function() return cursor_data.cursor_x, gArea_y+y_c_line end,
+    })
 
     -- cursor time
     lvgl.label({color=WHITE, font=FS.FONT_8,
@@ -437,8 +351,7 @@ function M.state_SHOW_GRAPH_INIT()
     local settings_dx = 5*lvSCALE
     local settings_h = LCD_H - header_h
     local settings_w = 150*lvSCALE
-    local h = 60*lvSCALE -- is800 and 100 or 55
-    -- local bSettings=lvgl.rectangle({x=LCD_W-settings_w,  y=header_h, w=settings_w, h=settings_h, color=LIGHTGREY, filled=true, opacity=30, visible=function() return show_settings end})
+    local h = 60*lvSCALE
     local bSettings=lvgl.box({x=LCD_W-settings_w, y=header_h, w=settings_w, h=settings_h, visible=function() return show_settings end})
     for sensIdx = 1, 4, 1 do
         local y_pos = 5*lvSCALE + (sensIdx-1)*(h+5*lvSCALE)
@@ -464,18 +377,40 @@ function M.state_SHOW_GRAPH_INIT()
                 },
                 {type="toggle", x=settings_w-65*lvSCALE, y=22*lvSCALE,
                     get = function()
-                        -- log("get [%s] visible: %s", sens_data[sensIdx].sensorName, sens_data[sensIdx].visible)
                         return (sens_data[sensIdx].visible==true and 1 or 0)
                     end,
                     set = function(i)
-                        -- log("Selected [%s] i: %s", sens_data[sensIdx].sensorName, i)
                         sens_data[sensIdx].visible = (i==1) and true or false
                     end ,
-                    -- active=function() return sens_data[sensIdx].visible end
                 },
              }
         })
     end
+
+    -- dynamic scale indicator (like google maps)
+    lvgl.box({x=math.floor(LCD_W/2 - LCD_W/7), y=LCD_H - 30 * lvSCALE,
+        children={
+            {type="label", font=FS.FONT_6, color=LIGHTGREY, text=function() return scale_info.label end,
+                pos=function() return scale_info.w/2 -20, 0 end
+            },
+            {type="hline", color=LIGHTGREY,
+                pos=function() return 0, 18*lvSCALE end,
+                size=function() return scale_info.w, 2*lvSCALE end
+            },
+            {type="vline", color=LIGHTGREY,
+                pos=function() return 0, 11*lvSCALE end,
+                size=function() return 2 * lvSCALE, 12*lvSCALE end
+            },
+            {type="vline", color=LIGHTGREY,
+                pos=function() return scale_info.w, 11*lvSCALE end,
+                size=function() return 2 * lvSCALE, 12*lvSCALE end
+            },
+        }
+    })
+
+
+
+
 
 
     -- debug info
@@ -505,42 +440,6 @@ function M.state_SHOW_GRAPH(event, touchState)
     if math.abs(adjust) > 100 then
         run_GRAPH_adjust_zoom(adjust)
     end
-
-    -- -- move cursor
-    -- local adjust = getValue('rud') / 200
-    -- if math.abs(adjust) > 0.5 then
-    --     run_GRAPH_adjust_coursor(adjust)
-    -- end
-    -- move cursor
-    -- local adjust = getValue('rud')
-    -- if adjust > 1000 then
-    --     cursor_data.cursor_x = LCD_W*0.85
-    --     center_delay_start = nil
-    -- elseif adjust<-1000 then
-    --     cursor_data.cursor_x = 10*lvSCALE
-    --     center_delay_start = nil
-    -- elseif math.abs(adjust) > 100 and math.abs(adjust) <= 1000 then
-    --     if center_delay_start == nil then
-    --         center_delay_start = getTime()
-    --     elseif getTime() - center_delay_start >= 100 then -- 100 * 10ms = 1 sec
-    --         cursor_data.cursor_x = LCD_W/2
-    --         center_delay_start = nil
-    --     end
-    -- else
-    --     center_delay_start = nil
-    -- end
-    -- local switch_val = getValue('SB')
-    -- local old_cursor_data = cursor_data.cursor_x
-    -- if switch_val > 1000 then
-    --     cursor_data.cursor_x = 10*lvSCALE
-    -- elseif switch_val==0 then
-    --     cursor_data.cursor_x = LCD_W/2
-    -- elseif switch_val<-1000 then
-    --     cursor_data.cursor_x = LCD_W*0.85
-    -- end
-    -- if old_cursor_data ~= cursor_data.cursor_x then
-    --     calc_graph_cursor()
-    -- end
 
     local x, y = bGraph:getScrollPos()
     -- log("run_GRAPH_Adjust: graphStart: %d, graphSize: %d, scroll: %sx%s", graphStart, graphSize, x,y)

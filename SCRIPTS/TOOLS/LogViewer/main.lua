@@ -1,4 +1,4 @@
--- TNS|Log Viewer 2 (LVGL)|TNE
+-- TNS|LogViewer 2|TNE
 
 local app_name = "LogViewer2"
 local APP_DIR = "/SCRIPTS/TOOLS/LogViewer/"
