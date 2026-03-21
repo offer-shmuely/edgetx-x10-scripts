@@ -1,0 +1,7 @@
+local fields_presets = {
+    { text="None (Clear All)",            fields={1, 1, 1, 1}                  },
+    { text="Rotorflight Power",           fields={"Vcel","Curr","Capa","Hspd"} },
+    { text="Rotorflight Headspeed",       fields={"Vcel","EscT","Hspd",1}      },
+}
+
+return fields_presets

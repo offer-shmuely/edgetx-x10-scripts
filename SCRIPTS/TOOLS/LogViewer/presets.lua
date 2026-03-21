@@ -4,7 +4,7 @@ local fields_presets = {
     { text="ELRS Link quality",           fields={"RQly","TPWR","RSNR","---"}  },
     { text="ELRS Antenna selection",      fields={"RQly","1RSS","2RSS","ANT"}  },
     { text="Rotorflight Power",           fields={"Vcel","Curr","Capa","Hspd"} },
-    { text="Rotorflight Headspeed",       fields={"Vcel","EscT","Hspd",1}      },
+    { text="Rotorflight Headspeed",       fields={"Hspd","Thr","Alt","SA"}      },
     { text="Rotorflight 3",               fields={"Vcel","Hspd","Curr","Capa","EscT"} },
     { text="Rotorflight 4",               fields={"EscT",1,1,1}                },
 }

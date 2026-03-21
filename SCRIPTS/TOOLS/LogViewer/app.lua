@@ -35,7 +35,7 @@ local M = {}
 -- run the script ...
 -- send me the log file that will be created on: /SCRIPTS/TOOLS/LogViewer/app.log
 
-local app_ver = "2.1"
+local app_ver = "2.2"
 
 local lvSCALE = lvgl.LCD_SCALE or 1
 local is800 = (LCD_W==800)
@@ -94,6 +94,8 @@ local STATE = {
 }
 
 local state = STATE.SPLASH_INIT
+local SPLASH_INTERVAL = 2000
+
 --Graph data
 local conversionSensorId = 0
 local conversionSensorProgress = 0
@@ -326,11 +328,19 @@ local function filter_log_file_list(filter_model_name, need_update)
     log_file_list_fullinfo[1].is_visible = (have_visibles==false)
 end
 
+local function select_first_visible_log_file()
+    for i = 1, #log_file_list_fullinfo do
+        if log_file_list_fullinfo[i].is_visible then
+            onLogFileChange(i)
+            return
+        end
+    end
+end
 
 local splash_start_time = 0
 
 local function state_SPLASH_INIT(event, touchState)
-    log("creating new window gui")
+    log("state_SPLASH_INIT")
     lvgl.clear()
 
     lvgl.build({
@@ -371,7 +381,7 @@ local function state_SPLASH(event, touchState)
     --log('elapsed: %d (t.durationMili: %d)', elapsed, splash_start_time)
     local elapsedMili = elapsed * 10;
     -- was 1500, but most the time will go anyway from the load of the scripts
-    if (elapsedMili >= 2500) then
+    if (elapsedMili >= SPLASH_INTERVAL) then
         state = STATE.SELECT_INDEX_TYPE_INIT
     end
 
@@ -380,7 +390,6 @@ end
 
 local function state_SELECT_INDEX_TYPE_INIT(event, touchState)
     log("state_SELECT_INDEX_TYPE_init()")
-    log("creating new window gui")
 
     local mainBox = build_ui_topbar()
 
@@ -461,7 +470,7 @@ end
 
 local function state_INDEX_FILES(event, touchState)
     if event == EVT_VIRTUAL_EXIT or event == EVT_VIRTUAL_PREV_PAGE then
-        state = STATE.SELECT_INDEX_TYPE
+        state = STATE.SELECT_INDEX_TYPE_INIT
         return 0
     end
 
@@ -513,6 +522,10 @@ local function state_INDEX_FILES(event, touchState)
     end
 
     collectgarbage("collect")
+    if event == EVT_VIRTUAL_EXIT or event == EVT_VIRTUAL_PREV_PAGE then
+        state = STATE.SELECT_INDEX_TYPE_INIT
+        return 0
+    end
     return 0
 end
 
@@ -523,12 +536,12 @@ local function state_SELECT_FILE_INIT(event, touchState)
     -- if select_file_gui_init == false then
         -- select_file_gui_init = true
         -- creating new window gui
-    log("creating new window gui")
+    log("state_SELECT_FILE_INIT")
 
     local mainBox = build_ui_topbar()
 
     mainBox:build({
-        {type="label", x=10*lvSCALE, y=25*lvSCALE, text="log file...", font=BOLD},
+        {type="label", x=10*lvSCALE, y=25*lvSCALE, text="Flight Chooser...", font=BOLD},
 
         { type="setting", x=0, y=60*lvSCALE,
             children={
@@ -544,6 +557,7 @@ local function state_SELECT_FILE_INIT(event, touchState)
                         filter_model_name_idx = i
                         log("Selected model-name: " .. filter_model_name)
                         filter_log_file_list(filter_model_name, true)
+                        select_first_visible_log_file()
                     end ,
                 },
             }
@@ -566,7 +580,7 @@ local function state_SELECT_FILE_INIT(event, touchState)
         end,
         filter=function(n)
             local is_visible = log_file_list_fullinfo[n].is_visible
-            log("dd-filter: %d, %s --> %s", n, log_file_list_friendly_names[n], is_visible)
+            -- log("dd-filter: %d, %s --> %s", n, log_file_list_friendly_names[n], is_visible)
             return is_visible
         end
     })
@@ -675,10 +689,8 @@ end
 local function colWithData2ColByHeader(colWithDataIdx)
     local sensorName = columns_with_data[colWithDataIdx]
     local colByHeaderId = 0
-
-    log("colWithData2ColByHeader: byData     - idx: %d, name: %s", colWithDataIdx, sensorName)
-
-    log("#columns_by_header: %d", #columns_by_header)
+    -- log("colWithData2ColByHeader: byData     - idx: %d, name: %s", colWithDataIdx, sensorName)
+    -- log("#columns_by_header: %d", #columns_by_header)
     for i = 1, #columns_by_header do
         if columns_by_header[i] == sensorName then
             colByHeaderId = i
@@ -686,27 +698,8 @@ local function colWithData2ColByHeader(colWithDataIdx)
             return colByHeaderId
         end
     end
-
-    log("colWithData2ColByHeader(%s) failed to find entry", colWithDataIdx)
+    -- log("colWithData2ColByHeader(%s) failed to find entry", colWithDataIdx)
     return -1
-end
-
-local function prepare_sensors_combo_data()
-    if sensorsComboProp[1].idx ~= 1 or sensorsComboProp[2].idx ~= 1 or sensorsComboProp[3].idx ~= 1 or sensorsComboProp[4].idx ~= 1 then
-        return -- keep the last selection
-    end
-
-    for i = 1, 4, 1 do
-        if i < #columns_with_data then
-            sensorsComboProp[i].idx = i + 1
-            log("Field %d. sensors is: %s", i, columns_with_data[i])
-            sensorsComboProp[i].values[i-1] = columns_with_data[i]
-        else
-            sensorsComboProp[i].idx = 1
-            sensorsComboProp[i].values[0] = "---"
-        end
-        log("state_SELECT_SENSORS_INIT [%d]=%d (total-sens: %d)", i , sensorsComboProp[i].idx, #columns_with_data)
-    end
 end
 
 local function get_combo_idx_by_name(sensor_name)
@@ -737,6 +730,24 @@ local function set_field(field_num, sensor)
     end
 end
 
+local function prepare_sensors_combo_data()
+    if sensorsComboProp[1].idx ~= 1 or sensorsComboProp[2].idx ~= 1 or sensorsComboProp[3].idx ~= 1 or sensorsComboProp[4].idx ~= 1 then
+        log("state_SELECT_SENSORS_INIT --> sensors already selected, skipping refresh")
+        return -- keep the last selection
+    end
+    log("state_SELECT_SENSORS_INIT --> prepare_sensors_combo_data, refreshing combo data with columns_with_data")
+
+    for i = 1, 4, 1 do
+        if i < #columns_with_data then
+            set_field_by_id(i, i + 1)
+            log("Field %d. sensors is: %s", i, columns_with_data[i])
+        else
+            set_field_by_id(i, 1)
+        end
+        log("state_SELECT_SENSORS_INIT [%d]=%d (total-sens: %d)", i , sensorsComboProp[i].idx, #columns_with_data)
+    end
+end
+
 local function state_SELECT_SENSORS_INIT()
     log("state_SELECT_SENSORS_INIT")
 
@@ -744,9 +755,6 @@ local function state_SELECT_SENSORS_INIT()
     prepare_sensors_combo_data()
 
     current_option = 1
-
-    -- creating new window gui
-    log("creating new window gui")
 
     local mainBox = build_ui_topbar()
 
@@ -853,12 +861,6 @@ local function state_SELECT_SENSORS_INIT()
         })
     end
 
-    -- default preset (4 first fields)
-    set_field_by_id(1, 2)
-    set_field_by_id(2, 3)
-    set_field_by_id(3, 4)
-    set_field_by_id(4, 5)
-
     state = STATE.SELECT_SENSORS
     return 0
 end
@@ -878,7 +880,7 @@ local function state_SELECT_SENSORS(event, touchState)
 end
 
 local function state_READ_FILE_DATA_INIT(event, touchState)
-    log("creating new window gui")
+    log("state_READ_FILE_DATA_INIT")
 
     local mainBox = build_ui_topbar()
 
