@@ -35,7 +35,7 @@ local M = {}
 -- run the script ...
 -- send me the log file that will be created on: /SCRIPTS/TOOLS/LogViewer/app.log
 
-local app_ver = "2.2"
+local app_ver = "2.3"
 
 local lvSCALE = lvgl.LCD_SCALE or 1
 local is800 = (LCD_W==800)
@@ -65,6 +65,17 @@ local index_type = INDEX_TYPE.TODAY
 local filename
 local filename_idx = 1
 local accuracy_idx = 1
+local file_data_info = {
+    is_new = nil,
+    start_time = nil,
+    end_time = nil,
+    total_seconds = nil,
+    total_lines = nil,
+    start_index = nil,
+    col_with_data_str = nil,
+    all_col_str = nil
+}
+
 
 local columns_by_header = {}
 local columns_with_data = {}
@@ -230,6 +241,64 @@ local function onLogFileChange(i)
     filename_idx = i
     filename = log_file_list_fullinfo[i].file_name
     log("Selected file index: %d, filename: %s", i, filename)
+
+    --Reset file load data
+    log("Reset file load data")
+    buffer = ""
+    lines = 0
+    heap = 2048 * 12
+
+    local is_new, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str = m_index_file.getFileDataInfo(filename)
+    file_data_info = {
+        is_new = is_new,
+        start_time = start_time,
+        end_time = end_time,
+        total_seconds = total_seconds,
+        total_lines = total_lines,
+        start_index = start_index,
+        col_with_data_str = col_with_data_str,
+        all_col_str = all_col_str
+    }
+
+    current_session = {
+        startTime = start_time,
+        endTime = end_time,
+        total_seconds = total_seconds,
+        total_lines = total_lines,
+        startIndex = start_index,
+        col_with_data_str = col_with_data_str,
+        all_col_str = all_col_str
+    }
+
+    -- update columns
+    local columns_temp, cnt = m_utils.split_pipe(col_with_data_str)
+    log("state_SELECT_FILE_refresh: #col: %d", cnt)
+    m_tables.table_clear(columns_with_data)
+    columns_with_data[1] = "---"
+    for i = 1, #columns_temp, 1 do
+        local col = columns_temp[i]
+        if m_utils.trim_safe(col) ~= "" then
+            columns_with_data[#columns_with_data + 1] = col
+            log("state_SELECT_FILE_refresh: col: [%s]", col)
+        end
+    end
+
+    --log("state_SELECT_FILE_refresh: #columns_with_data: %d", #columns_with_data)
+    --for i = #columns_temp, 4, 1 do
+    --    columns_with_data[#columns_with_data + 1] = "---"
+    --    log("state_SELECT_FILE_refresh: add empty field: %d", i)
+    --end
+    --m_tables.print(columns_with_data, "state_SELECT_FILE_refresh columns_with_data")
+
+    local columns_temp, cnt = m_utils.split_pipe(all_col_str)
+    log("state_SELECT_FILE_refresh: #col: %d", cnt)
+    m_tables.table_clear(columns_by_header)
+    for i = 1, #columns_temp, 1 do
+        local col = columns_temp[i]
+        columns_by_header[#columns_by_header + 1] = col
+        -- log("state_SELECT_FILE_refresh: col: %s", col)
+    end
+
 end
 
 local function onAccuracyChange(i)
@@ -345,24 +414,32 @@ local function state_SPLASH_INIT(event, touchState)
 
     lvgl.build({
         {type="rectangle", x=0, y=0, w=LCD_W, h=LCD_H, color=BLACK, filled=true},
-        {type="image", x=0, y=0, w=LCD_W, h=LCD_H, file=APP_DIR.."/img/bg1.png"},
+        {type="image",     x=0, y=0, w=LCD_W, h=LCD_H, file=APP_DIR.."/img/bg1.png"},
     })
 
     state = STATE.SPLASH
     return 0
 end
 
-local function build_ui_topbar()
+local function build_ui_topbar(prev_state, next_state, title_txt, subtitle_txt)
     lvgl.clear()
-    local mainBox = lvgl.box({x=0, y=0, w=LCD_W, h=LCD_H, scrollDir=lvgl.SCROLL_OFF})
-    mainBox:build({
-        {type="rectangle", x=0, y=0, w=LCD_W, h=20*lvSCALE, color=COLOR_THEME_SECONDARY1, filled=true},
-        -- {type="label", x=5, y=1, text="Flight History Viewer", color=WHITE, font=FS.FONT_6},
+    title_txt = title_txt or "Log Viewer 2" .. "   (v" .. app_ver .. ")"
+    subtitle_txt = subtitle_txt or  "---"
+    local pg
+    if prev_state == nil and next_state == nil then
+        pg = lvgl.page({title=title_txt, subtitle=subtitle_txt, scrollDir=lvgl.SCROLL_OFF,
+            backButton=false,
+        })
+    else
+        pg = lvgl.page({title=title_txt, subtitle=subtitle_txt, scrollDir=lvgl.SCROLL_OFF,
+            backButton=false,
+            prevButton={press=function() state = prev_state end},
+            nextButton={press=function() state = next_state end},
+        })
+    end
+    return pg
 
-        {type="label", x=30*lvSCALE, y=1*lvSCALE, text=function() return filename or "---" end, color=WHITE, font=FS.FONT_6, visible=function() return filename~=nil end},
-        {type="label", x=LCD_W-70*lvSCALE, y=1*lvSCALE, text="v" .. app_ver, color=WHITE, font=FS.FONT_6},
-    })
-    return mainBox
+
 end
 
 local function buildUiProgress(panel, x,y, w, h, percentFunc)
@@ -391,34 +468,33 @@ end
 local function state_SELECT_INDEX_TYPE_INIT(event, touchState)
     log("state_SELECT_INDEX_TYPE_init()")
 
-    local mainBox = build_ui_topbar()
+    local mainBox = build_ui_topbar(STATE.SPLASH_INIT, STATE.INDEX_FILES_INIT, nil, "Indexing selection")
 
     mainBox:build({
-        {type="label", x=LCD_W/2-100*lvSCALE, y=1*lvSCALE, text="Flight History Viewer", color=WHITE, font=FS.FONT_6},
-        {type="label", x=10*lvSCALE, y=30*lvSCALE, text="Indexing selection"},
+        -- {type="label", x=10*lvSCALE, y=10*lvSCALE, text="Indexing selection"},
 
-        {type="button", x=90*lvSCALE, y=60*lvSCALE, w=320*lvSCALE, h=45*lvSCALE, text="Last Flight (fast)", press=
+        {type="button", x=90*lvSCALE, y=10*lvSCALE, w=320*lvSCALE, h=45*lvSCALE, text="Last Flight (fast)", press=
             function()
                 log("onButtonIndexTypeLastFlight")
                 index_type = INDEX_TYPE.LAST_ONE
                 state = STATE.INDEX_FILES_INIT
             end
         },
-        {type="button", x=90*lvSCALE, y=110*lvSCALE, w=320*lvSCALE, h=45*lvSCALE, text="Index Last Day", press=
+        {type="button", x=90*lvSCALE, y=60*lvSCALE, w=320*lvSCALE, h=45*lvSCALE, text="Index Last Day", press=
             function()
                 log("onButtonIndexTypeToday")
                 index_type = INDEX_TYPE.TODAY;
                 state = STATE.INDEX_FILES_INIT;
             end
         },
-        {type="button", x=90*lvSCALE, y=160*lvSCALE, w=320*lvSCALE, h=45*lvSCALE, text="Index Last 10 Flights", press=
+        {type="button", x=90*lvSCALE, y=110*lvSCALE, w=320*lvSCALE, h=45*lvSCALE, text="Index Last 10 Flights", press=
             function()
                 log("onButtonIndexTypeLast10Flights")
                 index_type = INDEX_TYPE.LAST_10
                 state = STATE.INDEX_FILES_INIT;
             end
         },
-        {type="button", x=90*lvSCALE, y= 210*lvSCALE, w=320*lvSCALE, h=45*lvSCALE, text="Index All Flights (slow)", press=
+        {type="button", x=90*lvSCALE, y= 160*lvSCALE, w=320*lvSCALE, h=45*lvSCALE, text="Index All Flights (slow)", press=
             function()
                 log("onButtonIndexTypeAll")
                 index_type = INDEX_TYPE.ALL
@@ -429,6 +505,8 @@ local function state_SELECT_INDEX_TYPE_INIT(event, touchState)
     })
 
     log_file_list_raw = {}
+    log_file_list_raw_idx = -1
+    filename = nil
     state = STATE.SELECT_INDEX_TYPE
     return 0
 end
@@ -446,15 +524,15 @@ end
 local function state_INDEX_FILES_INIT(event, touchState)
     log("state_INDEX_FILES_INIT()")
 
-    local mainBox = build_ui_topbar()
+    local mainBox = build_ui_topbar(nil, nil, nil, "Analyzing & Indexing files...")
 
     mainBox:build({
-        {type="label", x=5, y=30, font=BOLD+FS.FONT_8, text="Analyzing & indexing files"},
-        {type="label", x=5, y=60, font=FS.FONT_8, text=function() return string.format("indexing files: (%d/%d)", log_file_list_raw_idx, #log_file_list_raw) end},
-        {type="label", x=5, y=120, font=FS.FONT_8, text=function() return string.format("* %s", filename) end},
+        -- {type="label", x=5, y=30, font=BOLD+FS.FONT_8, text="Analyzing & indexing files"},
+        {type="label", x=20*lvSCALE, y=60*lvSCALE,  font=FS.FONT_8, text=function() return string.format("indexing files: (%d/%d)", log_file_list_raw_idx, #log_file_list_raw) end},
+        {type="label", x=20*lvSCALE, y=120*lvSCALE, font=FS.FONT_8, text=function() return string.format("* %s", filename) end},
     })
 
-    buildUiProgress(mainBox, 40,90, 470-40, 16,
+    buildUiProgress(mainBox, 20*lvSCALE, 60*lvSCALE, LCD_W-10*lvSCALE-20*lvSCALE, 16*lvSCALE,
         function()
             local current = log_file_list_raw_idx
             local total = #log_file_list_raw
@@ -530,20 +608,18 @@ local function state_INDEX_FILES(event, touchState)
 end
 
 local function state_SELECT_FILE_INIT(event, touchState)
+    log("state_SELECT_FILE_INIT")
+
     create_log_file_list()
     filter_log_file_list(nil, false)
 
-    -- if select_file_gui_init == false then
-        -- select_file_gui_init = true
-        -- creating new window gui
-    log("state_SELECT_FILE_INIT")
+    onLogFileChange(2)
 
-    local mainBox = build_ui_topbar()
+    local mainBox = build_ui_topbar(STATE.SELECT_INDEX_TYPE_INIT, STATE.SELECT_SENSORS_INIT, nil, "Flight Chooser...")
 
     mainBox:build({
-        {type="label", x=10*lvSCALE, y=25*lvSCALE, text="Flight Chooser...", font=BOLD},
-
-        { type="setting", x=0, y=60*lvSCALE,
+        -- model
+        { type="setting", x=0, y=10*lvSCALE,
             children={
                 { type="label", x=5*lvSCALE, y=0, text="Model" },
                 { type = "choice", x=90*lvSCALE, w=380*lvSCALE, title = "Model",
@@ -561,34 +637,33 @@ local function state_SELECT_FILE_INIT(event, touchState)
                     end ,
                 },
             }
-        }
-    })
+        },
 
-    -- file
-    local st = lvgl.setting({x=0, y=100*lvSCALE})
-    st:label({ x=5*lvSCALE, y=0, text="Logfile" })
-    bddLogFile2 = st:box({ x=90*lvSCALE, w=380*lvSCALE})
-    bddLogFile2:choice({x=0, w=380*lvSCALE, title = "Logfile",
-        popupWidth = 400*lvSCALE,
-        values = log_file_list_friendly_names,
-        get = function()
-            -- log("filename_idx: %s, %s", filename_idx, log_file_list_fullinfo[filename_idx].file_name)
-            return filename_idx
-        end,
-        set = function(i)
-            onLogFileChange(i)
-        end,
-        filter=function(n)
-            local is_visible = log_file_list_fullinfo[n].is_visible
-            -- log("dd-filter: %d, %s --> %s", n, log_file_list_friendly_names[n], is_visible)
-            return is_visible
-        end
-    })
-    onLogFileChange(2)
+        -- file
+        { type="setting", x=0, y=50*lvSCALE,
+            children={
+                {type="label", x=5*lvSCALE, y=0, text="Logfile" },
+                { type = "choice", x=90*lvSCALE, w=380*lvSCALE, title = "Logfile",
+                    popupWidth = 400*lvSCALE,
+                    values = log_file_list_friendly_names,
+                    get = function()
+                        -- log("filename_idx: %s, %s", filename_idx, log_file_list_fullinfo[filename_idx].file_name)
+                        return filename_idx
+                    end,
+                    set = function(i)
+                        onLogFileChange(i)
+                    end,
+                    filter=function(n)
+                        local is_visible = log_file_list_fullinfo[n].is_visible
+                        -- log("dd-filter: %d, %s --> %s", n, log_file_list_friendly_names[n], is_visible)
+                        return is_visible
+                    end
+                },
+            }
+        },
 
-    -- Accuracy
-    lvgl.build({
-        { type="setting", x=0, y=140*lvSCALE,
+        -- Accuracy
+        { type="setting", x=0, y=90*lvSCALE,
             children={
                 { type="label", x=5*lvSCALE, y=0, text="Accuracy" },
                 { type = "choice", x=90*lvSCALE, w=380*lvSCALE, title = "Accuracy",
@@ -607,7 +682,24 @@ local function state_SELECT_FILE_INIT(event, touchState)
                 },
             }
         },
+
+        {type="label", x=5*lvSCALE, y=140*lvSCALE, font=FS.FONT_8, text="File info:"},
+        {type="label", x=100*lvSCALE, y=140*lvSCALE, font=FS.FONT_8,
+            text=function()
+                return string.format("%s sec \n%s log lines", file_data_info.total_seconds, file_data_info.total_lines)
+            end
+        },
+        {type="label", x=100*lvSCALE, y=185*lvSCALE, font=FS.FONT_6,
+            text=function()
+                return string.format("sensors: %s", file_data_info.col_with_data_str)
+            end
+        },
+
     })
+
+
+
+
     accuracy_idx = 1
     onAccuracyChange(1)
 
@@ -617,11 +709,11 @@ local function state_SELECT_FILE_INIT(event, touchState)
     return 0
 end
 
+
 local function state_SELECT_FILE(event, touchState)
     -- ## file selected
     if event == EVT_VIRTUAL_EXIT or event == EVT_VIRTUAL_PREV_PAGE then
         log("state_SELECT_SENSORS_refresh EVT_VIRTUAL_PREV_PAGE")
-        filename = nil
         state = STATE.SELECT_INDEX_TYPE_INIT
         return 0
 
@@ -630,53 +722,6 @@ local function state_SELECT_FILE(event, touchState)
         if filename == "not found" or filename == "---" then
             m_log.warn("state_SELECT_FILE_refresh: trying to next-page, but no logfile available, ignoring.")
             return 0
-        end
-
-        --Reset file load data
-        log("Reset file load data")
-        buffer = ""
-        lines = 0
-        heap = 2048 * 12
-
-        local is_new, start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str = m_index_file.getFileDataInfo(filename)
-
-        current_session = {
-            startTime = start_time,
-            endTime = end_time,
-            total_seconds = total_seconds,
-            total_lines = total_lines,
-            startIndex = start_index,
-            col_with_data_str = col_with_data_str,
-            all_col_str = all_col_str
-        }
-
-        -- update columns
-        local columns_temp, cnt = m_utils.split_pipe(col_with_data_str)
-        log("state_SELECT_FILE_refresh: #col: %d", cnt)
-        m_tables.table_clear(columns_with_data)
-        columns_with_data[1] = "---"
-        for i = 1, #columns_temp, 1 do
-            local col = columns_temp[i]
-            if m_utils.trim_safe(col) ~= "" then
-                columns_with_data[#columns_with_data + 1] = col
-                log("state_SELECT_FILE_refresh: col: [%s]", col)
-            end
-        end
-
-        --log("state_SELECT_FILE_refresh: #columns_with_data: %d", #columns_with_data)
-        --for i = #columns_temp, 4, 1 do
-        --    columns_with_data[#columns_with_data + 1] = "---"
-        --    log("state_SELECT_FILE_refresh: add empty field: %d", i)
-        --end
-        --m_tables.print(columns_with_data, "state_SELECT_FILE_refresh columns_with_data")
-
-        local columns_temp, cnt = m_utils.split_pipe(all_col_str)
-        log("state_SELECT_FILE_refresh: #col: %d", cnt)
-        m_tables.table_clear(columns_by_header)
-        for i = 1, #columns_temp, 1 do
-            local col = columns_temp[i]
-            columns_by_header[#columns_by_header + 1] = col
-            -- log("state_SELECT_FILE_refresh: col: %s", col)
         end
 
         state = STATE.SELECT_SENSORS_INIT
@@ -756,12 +801,10 @@ local function state_SELECT_SENSORS_INIT()
 
     current_option = 1
 
-    local mainBox = build_ui_topbar()
+    local mainBox = build_ui_topbar(STATE.SELECT_FILE_INIT, STATE.READ_FILE_DATA_INIT, filename, "Sensors selection...")
 
     mainBox:build({
-        {type="label", x=10*lvSCALE, y=25*lvSCALE, text="Select sensors...", font=BOLD},
-
-        { type="setting", x=0, y=60*lvSCALE,
+        { type="setting", x=0, y=10*lvSCALE,
             children={
                 { type="label", x=5*lvSCALE, y=3*lvSCALE, text="Field 1" },
                 { type = "choice", x=70*lvSCALE, y=0, w=120*lvSCALE, title = "Field 1",
@@ -778,7 +821,7 @@ local function state_SELECT_SENSORS_INIT()
                 },
             }
         },
-        { type="setting", x=0, y=100*lvSCALE,
+        { type="setting", x=0, y=50*lvSCALE,
             children={
                 { type="label", x=5*lvSCALE, y=3*lvSCALE, text="Field 2" },
                 { type = "choice", x=70*lvSCALE, y=0, w=120*lvSCALE, title = "Field 2",
@@ -793,7 +836,7 @@ local function state_SELECT_SENSORS_INIT()
                 },
             }
         },
-        { type="setting", x=0, y=140*lvSCALE,
+        { type="setting", x=0, y=90*lvSCALE,
             children={
                 { type="label", x=5*lvSCALE, y=3*lvSCALE, text="Field 3" },
                 { type = "choice", x=70*lvSCALE, y=0, w=120*lvSCALE, title = "Field 3",
@@ -808,7 +851,7 @@ local function state_SELECT_SENSORS_INIT()
                 },
             }
         },
-        { type="setting", x=0, y=180*lvSCALE,
+        { type="setting", x=0, y=130*lvSCALE,
             children={
                 { type="label", x=5*lvSCALE, y=3*lvSCALE, text="Field 4" },
                 { type = "choice", x=70*lvSCALE, y=0, w=120*lvSCALE, title = "Field 4",
@@ -882,13 +925,13 @@ end
 local function state_READ_FILE_DATA_INIT(event, touchState)
     log("state_READ_FILE_DATA_INIT")
 
-    local mainBox = build_ui_topbar()
+    local mainBox = build_ui_topbar(nil, nil, filename, "Reading file data...")
 
     mainBox:build({
-        {type="label", x=5*lvSCALE, y=25*lvSCALE, text="Reading data from file...", font=BOLD},
-        {type="label", x=5*lvSCALE, y=60*lvSCALE, text=function() return string.format("Reading line: %s", lines) end},
+        -- {type="label", x=5*lvSCALE, y=25*lvSCALE, text="Reading data from file...", font=BOLD},
+        {type="label", x=20*lvSCALE, y=60*lvSCALE, text=function() return string.format("Reading line: %s", lines) end},
     })
-    buildUiProgress(mainBox, 140*lvSCALE,60*lvSCALE, 470*lvSCALE-140*lvSCALE, 16*lvSCALE,
+    buildUiProgress(mainBox, 20*lvSCALE,60*lvSCALE, LCD_W-10*lvSCALE-20*lvSCALE, 16*lvSCALE,
         function()
             local current = lines
             local total = current_session.total_lines
@@ -905,7 +948,7 @@ local function state_READ_FILE_DATA_INIT(event, touchState)
     -- for i = 1, 4, 1 do
     --     local bField = mainBox:box({x=0, y=y+dy*(i-1), })
     --     bField:label({ x=5, y=0, text=function() return string.format("Parsing Field %d: ", i) end})
-    --     buildUiProgress(bField, 140,0, 470-140, 16,
+    --     buildUiProgress(bField, 140*lvSCALE,0, LCD_W-10*lvSCALE-140*lvSCALE, 16*lvSCALE,
     --         function()
     --             local pct
     --             -- log("conversionSensorId: %s == i:%s",conversionSensorId, i)
