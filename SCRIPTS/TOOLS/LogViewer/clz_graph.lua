@@ -586,7 +586,6 @@ function M.state_SHOW_GRAPH_INIT()
                 end,
                 color=function() return graphConfigSens[sensIdx].color end,
                 thickness=1,
-                dashGap=5, dashWidth=5,
                 visible=function() return sens_data[sensIdx].visible and cursor_data.visible end
             })
 
