@@ -35,7 +35,7 @@ local M = {}
 -- run the script ...
 -- send me the log file that will be created on: /SCRIPTS/TOOLS/LogViewer/app.log
 
-local app_ver = "2.3"
+local app_ver = "2.4"
 
 local lvSCALE = lvgl.LCD_SCALE or 1
 local is800 = (LCD_W==800)
@@ -234,7 +234,7 @@ local function get_log_files_list()
     end
 
     log("internal error, unknown index_type: %s", index_type)
-    return nil
+    return {}
 end
 
 local function onLogFileChange(i)
@@ -275,8 +275,8 @@ local function onLogFileChange(i)
     log("state_SELECT_FILE_refresh: #col: %d", cnt)
     m_tables.table_clear(columns_with_data)
     columns_with_data[1] = "---"
-    for i = 1, #columns_temp, 1 do
-        local col = columns_temp[i]
+    for ic = 1, #columns_temp, 1 do
+        local col = columns_temp[ic]
         if m_utils.trim_safe(col) ~= "" then
             columns_with_data[#columns_with_data + 1] = col
             log("state_SELECT_FILE_refresh: col: [%s]", col)
@@ -293,8 +293,8 @@ local function onLogFileChange(i)
     local columns_temp, cnt = m_utils.split_pipe(all_col_str)
     log("state_SELECT_FILE_refresh: #col: %d", cnt)
     m_tables.table_clear(columns_by_header)
-    for i = 1, #columns_temp, 1 do
-        local col = columns_temp[i]
+    for ic = 1, #columns_temp, 1 do
+        local col = columns_temp[ic]
         columns_by_header[#columns_by_header + 1] = col
         -- log("state_SELECT_FILE_refresh: col: %s", col)
     end
@@ -423,7 +423,7 @@ end
 
 local function build_ui_topbar(prev_state, next_state, title_txt, subtitle_txt)
     lvgl.clear()
-    title_txt = title_txt or "Log Viewer 2" .. "   (v" .. app_ver .. ")"
+    title_txt = title_txt or ("Log Viewer 2" .. "   (v" .. app_ver .. ")")
     subtitle_txt = subtitle_txt or  "---"
     local pg
     if prev_state == nil and next_state == nil then

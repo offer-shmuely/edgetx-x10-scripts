@@ -7,14 +7,14 @@ local m_tables = args[5]
 local m_lib_file_parser = args[6]
 local app_ver = args[7]
 
-
--- local tap_count = 0
 -- local table_explorer=assert(loadScript("/WIDGETS/_libs/table_explorer.lua"))()
 
 -- better font size names
 local FS={FONT_38=XXLSIZE,FONT_16=DBLSIZE,FONT_12=MIDSIZE,FONT_8=0,FONT_6=SMLSIZE}
 local lvSCALE = lvgl.LCD_SCALE or 1
 local is800 = (LCD_W==800)
+
+local MAX_SENSORS = 4
 
 local M = {
     kind="clz_graph",
@@ -83,7 +83,6 @@ local cursor_data = {
 }
 
 
-
 graphConfig.valPos2x = function(valPos)
     return (valPos - 1) * graphConfig.xStep
 end
@@ -107,12 +106,12 @@ function M.init(graphTimeBase1, sens1, sens2, sens3, sens4, filename1)
     graphTimeBase = graphTimeBase1
     filename = filename1
     sens_data = { sens1, sens2, sens3, sens4 }
-    for sensIdx = 1, 4, 1 do
+    for sensIdx = 1, MAX_SENSORS, 1 do
         sens_data[sensIdx].setConfig(graphConfigSens[sensIdx])
     end
 
     -- clear full-resolution points so calc_ graph_ line re-samples to 101 screen points
-    for sensIdx = 1, 4, 1 do
+    for sensIdx = 1, MAX_SENSORS, 1 do
         sens_data[sensIdx].clearLinePoints()
     end
     graphConfig.zoomLevel = DEFAULT_ZOOM_LEVEL -- reset zoom level
@@ -152,7 +151,7 @@ local function calc_graph_cursor()
     -- log("calc_graph_cursor cursor_time_sec: %s, cursorValPos: %s, cursorFrac: %.2f", cursor_data.cursor_time_sec, cursorValPos, cursorFrac)
 
     -- draw cursor values
-    for sensIdx = 1, 4, 1 do
+    for sensIdx = 1, MAX_SENSORS, 1 do
         if sens_data[sensIdx].isUsedAndReady() == false then
             goto continue -- poor man continue
         end
@@ -179,7 +178,7 @@ local function calc_graph_cursor()
 
     -- sort sensor labels vertically by value: higher value (smaller cursor_y) ? smaller rank ? higher on screen
     local active_sens = {}
-    for i = 1, 4 do
+    for i = 1, MAX_SENSORS do
         if sens_data[i].isUsedAndReady() then
             active_sens[#active_sens + 1] = i
         end
@@ -190,7 +189,7 @@ local function calc_graph_cursor()
     for rank_0 = 1, #active_sens do
         cursor_data.vals[active_sens[rank_0]].rank = rank_0 - 1
     end
-    for i = 1, 4 do
+    for i = 1, MAX_SENSORS do
         if not sens_data[i].isUsedAndReady() then
             cursor_data.vals[i].rank = i - 1
         end
@@ -240,7 +239,7 @@ local function calc_timeline(graphConfig)
     end
     -- find total data length (use longest active sensor)
     local data_count = 0
-    for i = 1, 4 do
+    for i = 1, MAX_SENSORS do
         if sens_data[i].isUsed() then
             data_count = math.max(data_count, sens_data[i].valsCount())
         end
@@ -269,7 +268,7 @@ local function recalculateGraph()
     log("recalculateGraph()")
     calc_graph_params()
 
-    for sensIdx = 1, 4, 1 do
+    for sensIdx = 1, MAX_SENSORS, 1 do
         sens_data[sensIdx].calc_graph_line(graphConfig) -- include clearLinePoints
     end
     calc_graph_cursor()
@@ -306,7 +305,7 @@ function M.state_SHOW_GRAPH_INIT()
             {type="button", x=LCD_W-80*lvSCALE, w=75*lvSCALE, y=2, h=33*lvSCALE, text="Settings", --color=BLACK,
                 press=function()
                     show_settings = not show_settings
-                    log("settings button pressed: %s, show_settings: %s",i, show_settings)
+                    log("settings button pressed, show_settings: %s",show_settings)
                     return (show_settings==true) and 1 or 0
                 end
             },
@@ -516,11 +515,11 @@ function M.state_SHOW_GRAPH_INIT()
     end
 
     -- lines
-    for sensIdx = 1, 4, 1 do
+    for sensIdx = 1, MAX_SENSORS, 1 do
         sens_data[sensIdx].build_ui_line(bGraph)
     end
 
-    local bCursorLabels = lvgl.rectangle({
+    lvgl.rectangle({
         pos=function() return cursor_data.cursor_x + cursor_data.labels_box.dx, cursor_data.labels_box.y end,
         w=cursor_data.labels_box.w, h=cursor_data.labels_box.h,
         filled=true, rounded=8 ,color=LIGHTGREY, opacity=150,
@@ -548,9 +547,9 @@ function M.state_SHOW_GRAPH_INIT()
     })
 
     -- cursor values
-    for sensIdx = 1, 4, 1 do
-        local valLabel_x = 30 + (sensIdx-1)*150*lvSCALE
-        local valLabel_y = 2
+    for sensIdx = 1, MAX_SENSORS, 1 do
+        -- local valLabel_x = 30 + (sensIdx-1)*150*lvSCALE
+        -- local valLabel_y = 2
         -- local valLabel_x = (sensIdx==1 or sensIdx==3) and LCD_W/2-100*lvSCALE-cursor_data.vals[sensIdx].txt_w or LCD_W/2+100*lvSCALE
         -- local valLabel_y = (sensIdx<=2) and 3*lvSCALE or gArea_h-30*lvSCALE
 
@@ -580,7 +579,7 @@ function M.state_SHOW_GRAPH_INIT()
 
             lvgl.line({
                 pts=function() return {
-                    {cursor_data.cursor_x, gArea_y + sens_data[sensIdx].cursor_y or 0},  -- vline side
+                    {cursor_data.cursor_x, gArea_y + (sens_data[sensIdx].cursor_y or 0)},  -- vline side
                     {cursor_data.cursor_x + 50*lvSCALE, valLabel_y_base + cursor_data.vals[sensIdx].rank * 25*lvSCALE + 12*lvSCALE}  -- label side
                 }
                 end,
@@ -591,7 +590,7 @@ function M.state_SHOW_GRAPH_INIT()
 
             lvgl.circle({
                 pos=function()
-                    return cursor_data.cursor_x, gArea_y + sens_data[sensIdx].cursor_y or 0
+                    return cursor_data.cursor_x, gArea_y + (sens_data[sensIdx].cursor_y or 0)
                 end,
                 radius=4*lvSCALE,
                 color=graphConfigSens[sensIdx].color,
@@ -608,7 +607,7 @@ function M.state_SHOW_GRAPH_INIT()
     local settings_w = 150*lvSCALE
     local h = 60*lvSCALE
     local bSettings=lvgl.box({x=LCD_W-settings_w, y=header_h, w=settings_w, h=settings_h, visible=function() return show_settings end})
-    for sensIdx = 1, 4, 1 do
+    for sensIdx = 1, MAX_SENSORS, 1 do
         local y_pos = 5*lvSCALE + (sensIdx-1)*(h+5*lvSCALE)
 
         bSettings:box({x=0, y=y_pos, w=settings_w, h=200,visible=function() return show_settings end,
@@ -645,9 +644,10 @@ function M.state_SHOW_GRAPH_INIT()
         })
     end
 
-    lvgl.rectangle({x=LCD_W-100, y=LCD_H-16, w=100, h=16, filled=true, color=BLACK})
-    lvgl.image({x=LCD_W-100, y=LCD_H-16, w=100, h=16, file=APP_DIR.."/img/bg4.png"})
+    lvgl.rectangle({x=LCD_W-100*lvSCALE, y=LCD_H-16*lvSCALE, w=100*lvSCALE, h=16*lvSCALE, filled=true, color=BLACK})
+    lvgl.image({x=LCD_W-100*lvSCALE, y=LCD_H-16*lvSCALE, w=100*lvSCALE, h=16*lvSCALE, file=APP_DIR.."/img/bg4.png"})
     lvgl.label({x=5*lvSCALE, y=TIMELINE_Y-16*lvSCALE, text="v" .. app_ver, color=GREY, font=FS.FONT_6})
+
 
     -- debug info
     lvgl.box({x=10, y=150, visible=function() return show_dbg end,
@@ -746,7 +746,7 @@ function M.state_SHOW_GRAPH(event, touchState)
     if event == EVT_TOUCH_TAP then
         cursor_data.visible = true
         cursor_data.cursor_x = touchState.x
-        log("tap: time=%d, x=%d, y=%d, visible=%s", last_tap_time, touchState.x, touchState.y, cursor_data.visible)
+        log("tap: x=%d, y=%d, visible=%s", touchState.x, touchState.y, cursor_data.visible)
     end
 
 
