@@ -1,3 +1,18 @@
+---- #########################################################################
+---- #                                                                       #
+---- # License: Creative Commons Attribution-NoDerivatives 4.0 (CC BY-ND)    #
+---- # https://creativecommons.org/licenses/by-nd/4.0/                       #
+---- #                                                                       #
+---- # You are free to use and modify this software for personal use.        #
+---- # You may share this software in its original, unmodified form,         #
+---- # as long as appropriate credit is given to the original author.        #
+---- #                                                                       #
+---- # Redistribution of modified versions is NOT permitted.                 #
+---- #                                                                       #
+---- # Copyright (c) 2023-2026 Offer Shmuely. All rights reserved.           #
+---- #                                                                       #
+---- #########################################################################
+
 local args = {...}
 local APP_DIR = args[1]
 local m_log = args[2]
@@ -8,21 +23,6 @@ local m_lib_file_parser = args[6]
 local m_index_file = args[7]
 
 local M = {}
-
----- #########################################################################
----- #                                                                       #
----- # License GPLv3: https://www.gnu.org/licenses/gpl-3.0.html              #
----- #                                                                       #
----- # This program is free software; you can redistribute it and/or modify  #
----- # it under the terms of the GNU General Public License version 2 as     #
----- # published by the Free Software Foundation.                            #
----- #                                                                       #
----- # This program is distributed in the hope that it will be useful        #
----- # but WITHOUT ANY WARRANTY; without even the implied warranty of        #
----- # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         #
----- # GNU General Public License for more details.                          #
----- #                                                                       #
----- #########################################################################
 
 -- This script display a log file as a graph
 -- Original Author: Herman Kruisman (RealTadango) (original version: https://raw.githubusercontent.com/RealTadango/FrSky/master/OpenTX/LView/LView.lua)
@@ -35,7 +35,7 @@ local M = {}
 -- run the script ...
 -- send me the log file that will be created on: /SCRIPTS/TOOLS/LogViewer/app.log
 
-local app_ver = "2.4"
+local app_ver = "2.5"
 
 local lvSCALE = lvgl.LCD_SCALE or 1
 local is800 = (LCD_W==800)

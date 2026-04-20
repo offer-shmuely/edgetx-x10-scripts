@@ -1,5 +1,21 @@
 -- TNS|LogViewer 2|TNE
 
+---- #########################################################################
+---- #                                                                       #
+---- # License: Creative Commons Attribution-NoDerivatives 4.0 (CC BY-ND)    #
+---- # https://creativecommons.org/licenses/by-nd/4.0/                       #
+---- #                                                                       #
+---- # You are free to use and modify this software for personal use.        #
+---- # You may share this software in its original, unmodified form,         #
+---- # as long as appropriate credit is given to the original author.        #
+---- #                                                                       #
+---- # Redistribution of modified versions is NOT permitted.                 #
+---- #                                                                       #
+---- # Copyright (c) 2023-2026 Offer Shmuely. All rights reserved.           #
+---- #                                                                       #
+---- #########################################################################
+
+
 local app_name = "LogViewer2"
 local APP_DIR = "/SCRIPTS/TOOLS/LogViewer/"
 
