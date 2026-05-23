@@ -11,6 +11,8 @@ M.idx_file_name = "/flights-history.csv"
 
 M.log_files_index_info = {}
 
+local log = M.m_log.info
+
 function M.indexInit()
     M.m_tables.table_clear(M.log_files_index_info)
 end
@@ -20,13 +22,13 @@ local function compare_by_dates(a, b)
     --local b1 = string.sub(b.flight_date, -21, -5)
     local a1 = a.flight_date
     local b1 = b.flight_date
-    --M.m_log.info("ab, %s ? %s", a, b)
-    --M.m_log.info("a1b1, %s ? %s", a1, b1)
+    --log("ab, %s ? %s", a, b)
+    --log("a1b1, %s ? %s", a1, b1)
     return a1 < b1
 end
 
 local function insertFlight(flight_date, model_name, flight_count, duration, model_id)
-    M.m_log.info("updateFlight(%s)", flight_date)
+    log("updateFlight(%s)", flight_date)
 
     local key = string.format("key:%s", m_utils.trim(flight_date))
     local desc = string.format("%s - %s #%d (%d min)", flight_date, model_name, flight_count, duration/60)
@@ -48,42 +50,42 @@ local function insertFlight(flight_date, model_name, flight_count, duration, mod
             model_id = m_utils.trim(model_id),
             desc = desc
         }
-        M.m_log.info("4 updateFlight(%s) - ==%d== %s", key, new_fight.duration, new_fight.desc)
+        log("4 updateFlight(%s) - ==%d== %s", key, new_fight.duration, new_fight.desc)
         M.m_tables.list_ordered_insert(M.log_files_index_info, new_fight, compare_by_dates, 1)
     end
 end
 
 function M.getFlightInfoByKey(key)
-    --M.m_log.info("------------- getFlightInfoByKey start")
+    --log("------------- getFlightInfoByKey start")
     local tbl = M.log_files_index_info
     for i = 1, #tbl, 1 do
         local f_info = tbl[i]
-        -- M.m_log.info("getFlightInfoByKey-" .. f_info.key)
+        -- log("getFlightInfoByKey-" .. f_info.key)
 
         if f_info.key == key then
-            M.m_log.info("getFlightInfoByKey- found key: " .. f_info.key)
+            log("getFlightInfoByKey- found key: " .. f_info.key)
             return f_info
         end
     end
-    --M.m_log.info("------------- getFlightInfoByKey end")
+    --log("------------- getFlightInfoByKey end")
 end
 
 function M.indexPrint(prefix)
     local tbl = M.log_files_index_info
-    M.m_log.info("-------------show start (%s)", prefix)
+    log("-------------show start (%s)", prefix)
     for i = 1, #tbl, 1 do
         local f_info = tbl[i]
         local s = string.format("%d. flight_date: %s, model_name: %s, flight_count: %s, duration: %s, model_id: %s",
             i,
             f_info.flight_date, f_info.model_name, f_info.flight_count, f_info.duration, f_info.model_id)
 
-        M.m_log.info(s)
+        log(s)
     end
-    M.m_log.info("------------- show end")
+    log("------------- show end")
 end
 
 function M.historyFileRead()
-    M.m_log.info("historyFileRead()")
+    log("historyFileRead()")
     M.m_tables.table_clear(M.log_files_index_info)
     local hFile = io.open(M.idx_file_name, "r")
     if hFile == nil then
@@ -94,21 +96,21 @@ function M.historyFileRead()
     local data1 = io.read(hFile, 2048)
     local index = string.find(data1, "\n")
     if index == nil then
-        M.m_log.info("Index header could not be found, file: %s", M.idx_file_name)
+        log("Index header could not be found, file: %s", M.idx_file_name)
         return
     end
 
     -- check that index file is correct version
     local api_ver = string.match(data1, "# api_ver=(%d*)")
-    M.m_log.info("api_ver: %s", api_ver)
+    log("api_ver: %s", api_ver)
     if api_ver ~= "1" then
-        M.m_log.info("api_ver of index files is not updated (api_ver=%d)", api_ver)
+        log("api_ver of index files is not updated (api_ver=%d)", api_ver)
         return
     end
 
     -- get header line
     local headerLine = string.sub(data1, 1, index)
-    M.m_log.info("indexRead: header: %s", headerLine)
+    log("indexRead: header: %s", headerLine)
 
     io.seek(hFile, index)
     local data2 = io.read(hFile, 2048 * 32)
@@ -118,7 +120,7 @@ function M.historyFileRead()
     for line in string.gmatch(data2, "([^\n]+)\n") do
 
         if string.sub(line, 1, 1) ~= "#" then
-            M.m_log.info("indexRead: index-line: %s", line)
+            log("indexRead: index-line: %s", line)
             local values = m_utils.split(line)
 
             local flight_date = m_utils.trim(values[1])
@@ -130,10 +132,10 @@ function M.historyFileRead()
             -- if not a number, set to -1
             if not tonumber(duration) then
                 duration = -1
-                M.m_log.info("indexRead: duration is NOT a number")
+                log("indexRead: duration is NOT a number")
             end
 
-            M.m_log.info(
+            log(
                 "indexRead: line: flight_date: %s, model_name: %s, flight_count: %s, duration: %s, model_id: %s",
                 flight_date, model_name, flight_count, duration, model_id)
 
@@ -143,10 +145,10 @@ function M.historyFileRead()
             --# /models/model4.yml/duration=100.0
             --# /models/model4.yml/flight_count=15
 
-            M.m_log.info("indexRead: comment: [%s]", line)
+            log("indexRead: comment: [%s]", line)
             --local model_id, duration = string.match(line, "# /models/(%s*)/duration=(%d*)")
             local mid = string.match(line, "(%s*)")
-            M.m_log.info("indexRead: # model_id: (%s), duration: [%s]", mid, "555")
+            log("indexRead: # model_id: (%s), duration: [%s]", mid, "555")
         end
     end
 
@@ -156,19 +158,19 @@ function M.historyFileRead()
 end
 
 function M.getFileDataInfo(flight_date)
-    --M.m_log.info("getFileDataInfo(%s)", file_name)
+    --log("getFileDataInfo(%s)", file_name)
     --M.indexPrint("M.getFileDataInfo-start")
 
     for i = 1, #M.log_files_index_info do
         local f_info = M.log_files_index_info[i]
-        --M.m_log.info("getFileDataInfo: %s ?= %s", file_name, f_info.file_name)
+        --log("getFileDataInfo: %s ?= %s", file_name, f_info.file_name)
         if flight_date == f_info.flight_date then
-            --M.m_log.info("getFileDataInfo: info from cache %s", flight_date)
+            --log("getFileDataInfo: info from cache %s", flight_date)
             return f_info
         end
     end
 
-    M.m_log.info("getFileDataInfo: file not in index... %s", flight_date)
+    log("getFileDataInfo: file not in index... %s", flight_date)
     return false, nil, nil, nil, nil, nil, nil, nil
 end
 

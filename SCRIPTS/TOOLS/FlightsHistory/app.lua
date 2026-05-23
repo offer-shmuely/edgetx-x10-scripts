@@ -1,4 +1,4 @@
-local m_log,m_utils,m_tables,m_index_file,libGUIv4,app_ver  = ...
+local m_log,m_utils,m_tables,m_index_file,libGUIv4  = ...
 
 local M = {}
 
@@ -17,9 +17,17 @@ local M = {}
 ---- #                                                                       #
 ---- #########################################################################
 
--- This history of flights
+-- display the flights history as kept using the "Flights" widget
 -- Author: Offer Shmuely
 -- Date: 2023-2026
+local app_ver = "1.11"
+
+-- to get help:
+-- change in lib_log.lua to "ENABLE_LOG_FILE=true"
+-- change in lib_log.lua to "ENABLE_LOG_TO_FILE= false"
+-- run the script ...
+-- send me the log file that will be created on: /SCRIPTS/TOOLS/FlightsHistory/app.log
+
 
 local script_folder = "/SCRIPTS/TOOLS/FlightsHistory"
 local filter_model_name
@@ -192,8 +200,10 @@ local function state_SHOW_FLIGHTS_HIST_INIT(event, touchState)
             day,
             f_info.model_name,
             string.format("%s", f_info.flight_count),
-            string.format("%d:%02d", math.floor(f_info.duration//100), math.floor((f_info.duration/100 % 1) * 60)),
+            string.format("%d:%02d", f_info.duration // 60, f_info.duration % 60),
         }
+        -- log("lines_csv: %d. [%s] - %s - %s - %s", i, day, f_info.model_name, f_info.duration, string.format("%d:%02d", f_info.duration //60, f_info.duration %60))
+
     end
 
     libGUIv4.newCtl.ctl_table(nil, "count-table", {
