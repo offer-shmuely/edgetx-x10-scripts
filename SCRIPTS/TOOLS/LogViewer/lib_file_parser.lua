@@ -20,6 +20,8 @@ M.m_log = m_log
 M.app_name = app_name
 M.m_utils = m_utils
 
+local log = M.m_log.info
+
 --function cache
 local math_floor = math.floor
 local math_fmod = math.fmod
@@ -41,7 +43,7 @@ function M.getTotalSeconds(time)
 end
 
 function M.getFileDataInfo(fileName)
-    M.m_log.info("getFileDataInfo(%s)", fileName)
+    log("getFileDataInfo(%s)", fileName)
 
     --local t1_model =getTime()
 
@@ -66,13 +68,13 @@ function M.getFileDataInfo(fileName)
     local data1 = io.read(hFile, 2048)
     local index = string.find(data1, "\n")
     if index == nil then
-        M.m_log.info("Header could not be found, file: %s", fileName)
+        log("Header could not be found, file: %s", fileName)
         return nil, nil, nil, nil, nil, nil
     end
 
     -- get header line
     local headerLine = string.sub(data1, 1, index)
-    --M.m_log.info("header-line: [%s]", headerLine)
+    --log("header-line: [%s]", headerLine)
 
     -- get columns
     columns_by_header = M.m_utils.split(headerLine)
@@ -83,7 +85,7 @@ function M.getFileDataInfo(fileName)
     -- stop after 2M (1000x2028)
     local sample_col_data = nil
     for i = 1, 1000 do
-        --M.m_log.info("profiler: start")
+        --log("profiler: start")
         --local t1 =getTime()
         local data2 = io.read(hFile, 2048)
         --M.m_utils.timeProfilerAdd('read()', t1);
@@ -97,11 +99,11 @@ function M.getFileDataInfo(fileName)
             local first_time_sec = M.getTotalSeconds(start_time)
             local last_time_sec = M.getTotalSeconds(end_time)
             local total_seconds = last_time_sec - first_time_sec
-            M.m_log.info("parser:getFileDataInfo: done - [%s] lines: %d, duration: %dsec", fileName, total_lines, total_seconds)
+            log("parser:getFileDataInfo: done - [%s] lines: %d, duration: %dsec", fileName, total_lines, total_seconds)
 
             --for idxCol = 1, #columns_by_header do
             --    local col_name = columns_by_header[idxCol]
-            --    M.m_log.info("getFileDataInfo %s: %s", col_name, columns_is_have_data[idxCol])
+            --    log("getFileDataInfo %s: %s", col_name, columns_is_have_data[idxCol])
             --end
 
             for idxCol = 1, #columns_by_header do
@@ -124,9 +126,9 @@ function M.getFileDataInfo(fileName)
                 end
             end
 
-            --M.m_log.info("parser:getFileDataInfo: done - col_with_data_str: %s", col_with_data_str)
+            --log("parser:getFileDataInfo: done - col_with_data_str: %s", col_with_data_str)
             --for idxCol = 1, #columns_with_data do
-            --    M.m_log.info("getFileDataInfo@ %d: %s", idxCol, columns_with_data[idxCol])
+            --    log("getFileDataInfo@ %d: %s", idxCol, columns_with_data[idxCol])
             --end
 
             --M.m_utils.timeProfilerAdd(fileName, t1_model); -- total model parsing time
@@ -143,10 +145,10 @@ function M.getFileDataInfo(fileName)
         for line in line_list do
             --local t2 =getTime()
             total_lines = total_lines + 1
-            --M.m_log.info("getFileDataInfo: %d. line: %s", total_lines, line)
-            --M.m_log.info("getFileDataInfo2: line: %d", total_lines)
+            --log("getFileDataInfo: %d. line: %s", total_lines, line)
+            --log("getFileDataInfo2: line: %d", total_lines)
             local time = string.sub(line, 12, 19)
-            --M.m_log.info("getFileDataInfo: %d. time: %s", total_lines, time)
+            --log("getFileDataInfo: %d. time: %s", total_lines, time)
             if start_time == nil then
                 start_time = time
             end
@@ -183,9 +185,9 @@ function M.getFileDataInfo(fileName)
 
                 if have_data then
                     columns_is_have_data[idxCol] = true
-                    --M.m_log.info("find-col-with-d: %s=true", columns_by_header[idxCol])
+                    --log("find-col-with-d: %s=true", columns_by_header[idxCol])
                 --else
-                --    M.m_log.info("find-col-with-d: %s =false (%s <> %s)", columns_by_header[idxCol], vals[idxCol] , sample_col_data[idxCol])
+                --    log("find-col-with-d: %s =false (%s <> %s)", columns_by_header[idxCol], vals[idxCol] , sample_col_data[idxCol])
                 end
             end
             --M.m_utils.timeProfilerAdd('in-line4');
@@ -200,7 +202,7 @@ function M.getFileDataInfo(fileName)
 
     io.close(hFile)
 
-    M.m_log.info("error: file too long, %s", fileName)
+    log("error: file too long, %s", fileName)
     return nil, nil, nil, nil, nil, nil
 end
 

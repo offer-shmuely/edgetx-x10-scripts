@@ -4,6 +4,7 @@ local M = {}
 M.m_log = m_log
 M.app_name = app_name
 
+local log = M.m_log.info
 
 function M.print2(t, prefix)
     for k, v in pairs(t) do
@@ -18,7 +19,7 @@ function M.print2(t, prefix)
             if type(v) ~= 'string' then
                 vfmt = tostring(v)
             end
-            M.m_log.info(string.format("%s: (type:%s) %s=%s", (prefix or ''), type(t), kfmt, vfmt))
+            log(string.format("%s: (type:%s) %s=%s", (prefix or ''), type(t), kfmt, vfmt))
         end
     end
 end
@@ -31,30 +32,30 @@ function M.table_clear(tbl)
 end
 
 function M.print(tbl, prefix)
-    M.m_log.info(">>> table_print (%s)", prefix)
+    log(">>> table_print (%s)", prefix)
     for i = 1, #tbl, 1 do
         local val = tbl[i]
         if type(val) == "table" then
             local t_val = val
-            M.m_log.info("-++++------------ %d %s", #val, type(t_val))
+            log("-++++------------ %d %s", #val, type(t_val))
             for j = 1, #t_val, 1 do
                 local val = t_val[j]
-                 M.m_log.info(string.format('%s: [%d]="%s"', prefix, i, val))
+                 log(string.format('%s: [%d]="%s"', prefix, i, val))
             end
         elseif type(val) == "string" then
-            M.m_log.info(string.format('%s: [%d]= "%s"', prefix, i, val))
+            log(string.format('%s: [%d]= "%s"', prefix, i, val))
         else
-            M.m_log.info(string.format('%s: [%d]= "%s"', prefix, i, val))
+            log(string.format('%s: [%d]= "%s"', prefix, i, val))
         end
     end
-    M.m_log.info("<<< table_print end (%s) ", prefix)
+    log("<<< table_print end (%s) ", prefix)
 end
 
 function M.list_ordered_insert(lst, newVal, cmp, firstValAt)
     -- sort
     for i = firstValAt, #lst, 1 do
         -- remove duplication
-        --M.m_log.info("list_ordered_insert - %s ? %s",  newVal, lst[i] )
+        --log("list_ordered_insert - %s ? %s",  newVal, lst[i] )
         if newVal == lst[i] then
             --M.table_print("list_ordered_insert - duplicated", lst)
             return

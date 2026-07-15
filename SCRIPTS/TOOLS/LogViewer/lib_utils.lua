@@ -4,6 +4,8 @@ local M = {}
 M.m_log = m_log
 M.app_name = app_name
 
+local log = M.m_log.info
+
 --function cache
 local math_floor = math.floor
 local math_fmod = math.fmod
@@ -24,8 +26,8 @@ function M.split(text)
         cnt = cnt + 1
         result[cnt] = val
     end
-    --M.m_log.info("split: #col: %d (%s)", cnt, text)
-    --M.m_log.info("split: #col: %d (1-%s, 2-%s)", cnt, result[1], result[2])
+    --log("split: #col: %d (%s)", cnt, text)
+    --log("split: #col: %d (1-%s, 2-%s)", cnt, result[1], result[2])
     return result, cnt
 end
 
@@ -37,21 +39,21 @@ end
 --        cnt = cnt + 1
 --        result[cnt] = val
 --    end
---    --M.m_log.info("split: #col: %d (%s)", cnt, text)
---    --M.m_log.info("split: #col: %d (1-%s, 2-%s)", cnt, result[1], result[2])
+--    --log("split: #col: %d (%s)", cnt, text)
+--    --log("split: #col: %d (1-%s, 2-%s)", cnt, result[1], result[2])
 --    return result, cnt
 --end
 
 function M.split_pipe(text)
-    -- M.m_log.info("split_pipe(%s)", text)
+    -- log("split_pipe(%s)", text)
     local cnt = 0
     local result = {}
     for val in string.gmatch(string.gsub(text, "||", "| |"), "([^|]+)|?") do
         cnt = cnt + 1
         result[cnt] = val
     end
-    M.m_log.info("split_pipe: #col: %d (%s)", cnt, text)
-    M.m_log.info("split_pipe: #col: %d [1-%s, 2-%s, ...]", cnt, result[1], result[2])
+    log("split_pipe: #col: %d (%s)", cnt, text)
+    log("split_pipe: #col: %d [1-%s, 2-%s, ...]", cnt, result[1], result[2])
     return result, cnt
 end
 
@@ -158,12 +160,12 @@ function M.timeProfilerShow(is_now)
         local s = "profiler: \n"
 
         for name, valArr in pairs(M.prof.profTimes) do
-            M.m_log.info("profiler4: " .. name .. ", " .. valArr[1])
+            log("profiler4: " .. name .. ", " .. valArr[1])
             local s1 = string.format("xx  /%-15s - avg:%02.1f, max:%2d, last:%2d (count:%5s, tot:%03.3fsec)\n",
                 name, valArr[2] / valArr[1], valArr[4], valArr[3], valArr[1], valArr[2]/1000)
             s = s .. s1
         end
-        M.m_log.info(s);
+        log(s);
         M.periodicReset(M.prof.periodicProfiler)
     end
 end
