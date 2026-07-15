@@ -35,7 +35,7 @@ local M = {}
 -- run the script ...
 -- send me the log file that will be created on: /SCRIPTS/TOOLS/LogViewer/app.log
 
-local app_ver = "2.5"
+local app_ver = "2.6"
 
 local lvSCALE = lvgl.LCD_SCALE or 1
 local is800 = (LCD_W==800)
@@ -132,7 +132,7 @@ local sensorsComboProp = {
 local select_file_gui_init = false
 
 -- better font size names
-local FS={FONT_38=XXLSIZE,FONT_16=DBLSIZE,FONT_12=MIDSIZE,FONT_8=0,FONT_6=SMLSIZE}
+local FS={FONT_38=XXLSIZE,FONT_24=XLSIZE, FONT_16=DBLSIZE,FONT_12=MIDSIZE,FONT_8=0,FONT_6=SMLSIZE}
 
 --------------------------------------------------------------
 local function log(fmt, ...)
@@ -238,9 +238,21 @@ local function get_log_files_list()
 end
 
 local function onLogFileChange(i)
+    if i == nil or log_file_list_fullinfo[i] == nil then
+        log("onLogFileChange: invalid file index: %s", i)
+        filename_idx = 1
+        return
+    end
+
     filename_idx = i
+    log("Selected file index: %d", i)
     filename = log_file_list_fullinfo[i].file_name
     log("Selected file index: %d, filename: %s", i, filename)
+
+    if i==1 then
+        log("onLogFileChange: selected the first entry, which is the '---' entry, ignoring.")
+        return
+    end
 
     --Reset file load data
     log("Reset file load data")
@@ -349,6 +361,7 @@ local function create_log_file_list()
             log_file_info.freindly_name = string.format("%s (%.0fmin)", log_file_info.file_name, log_file_info.total_seconds/60)
             table.insert(log_file_list_fullinfo, log_file_info)
             table.insert(log_file_list_friendly_names, log_file_info.freindly_name)
+            log("create_log_file_list: [%s] - OK (filters:%s) (is_duration_ok:%s) (have_data_ok:%s)", log_file_info.file_name, filter_model_name, is_duration_ok, is_have_data_ok)
         else
             log("create_log_file_list: [%s] - FILTERED-OUT (filters:%s) (is_duration_ok:%s) (have_data_ok:%s)", log_file_info.file_name, filter_model_name, is_duration_ok, is_have_data_ok)
         end
@@ -404,6 +417,7 @@ local function select_first_visible_log_file()
             return
         end
     end
+    onLogFileChange(1) -- the "---" entry
 end
 
 local splash_start_time = 0
@@ -556,10 +570,12 @@ local function state_INDEX_FILES(event, touchState)
     --log("read_and_index_file_list(%d, %d)", log_file_list_raw_idx, #log_file_list_raw)
     if (#log_file_list_raw == 0) then
         log("state_INDEX_FILES: init")
+        filename = "reading log files list..."
         m_index_file.indexInit()
         log_file_list_raw = get_log_files_list()
         log_file_list_raw_idx = 0
         m_index_file.indexRead()
+        return 0
     end
 
     for i = 1, 10, 1 do
@@ -613,7 +629,13 @@ local function state_SELECT_FILE_INIT(event, touchState)
     create_log_file_list()
     filter_log_file_list(nil, false)
 
-    onLogFileChange(2)
+    -- if #log_file_list_fullinfo < 2 then
+    --     log("state_SELECT_FILE_INIT: no log files found, going back to index type selection")
+    --     state = STATE.SELECT_INDEX_TYPE_INIT
+    --     return 0
+    -- end
+    -- onLogFileChange(2)
+    select_first_visible_log_file()
 
     local mainBox = build_ui_topbar(STATE.SELECT_INDEX_TYPE_INIT, STATE.SELECT_SENSORS_INIT, nil, "Flight Chooser...")
 
@@ -686,12 +708,12 @@ local function state_SELECT_FILE_INIT(event, touchState)
         {type="label", x=5*lvSCALE, y=140*lvSCALE, font=FS.FONT_8, text="File info:"},
         {type="label", x=100*lvSCALE, y=140*lvSCALE, font=FS.FONT_8,
             text=function()
-                return string.format("%s sec \n%s log lines", file_data_info.total_seconds, file_data_info.total_lines)
+                return string.format("%s sec \n%s log lines", file_data_info.total_seconds or "0", file_data_info.total_lines or "0")
             end
         },
         {type="label", x=100*lvSCALE, y=185*lvSCALE, font=FS.FONT_6,
             text=function()
-                return string.format("sensors: %s", file_data_info.col_with_data_str)
+                return string.format("sensors: %s", file_data_info.col_with_data_str or "<no data avaiable>")
             end
         },
 
@@ -712,7 +734,7 @@ end
 
 local function state_SELECT_FILE(event, touchState)
     -- ## file selected
-    if event == EVT_VIRTUAL_EXIT or event == EVT_VIRTUAL_PREV_PAGE then
+    if event == EVT_VIRTUAL_PREV_PAGE then
         log("state_SELECT_SENSORS_refresh EVT_VIRTUAL_PREV_PAGE")
         state = STATE.SELECT_INDEX_TYPE_INIT
         return 0
@@ -909,7 +931,7 @@ local function state_SELECT_SENSORS_INIT()
 end
 
 local function state_SELECT_SENSORS(event, touchState)
-    if event == EVT_VIRTUAL_EXIT or event == EVT_VIRTUAL_PREV_PAGE then
+    if event == EVT_VIRTUAL_PREV_PAGE then
         log("state_SELECT_SENSORS_refresh EVT_VIRTUAL_PREV_PAGE")
         state = STATE.SELECT_FILE_INIT
         return 0
