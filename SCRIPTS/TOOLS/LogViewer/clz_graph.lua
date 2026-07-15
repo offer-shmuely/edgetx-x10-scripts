@@ -25,7 +25,7 @@ local app_ver = args[7]
 -- local table_explorer=assert(loadScript("/WIDGETS/_libs/table_explorer.lua"))()
 
 -- better font size names
-local FS={FONT_38=XXLSIZE,FONT_16=DBLSIZE,FONT_12=MIDSIZE,FONT_8=0,FONT_6=SMLSIZE}
+local FS={FONT_38=XXLSIZE,FONT_24=XLSIZE, FONT_16=DBLSIZE,FONT_12=MIDSIZE,FONT_8=0,FONT_6=SMLSIZE}
 local lvSCALE = lvgl.LCD_SCALE or 1
 local is800 = (LCD_W==800)
 
@@ -47,6 +47,7 @@ local sens_data = {}
 local filename = "---"
 local show_dbg = false
 local show_settings = false
+local is_recalc_state = false
 local scale_info = {
     w = 40,
     label = "?"
@@ -144,7 +145,7 @@ local function toDuration1(totalSeconds)
     local hours = math.floor(totalSeconds / 3600)
     totalSeconds = totalSeconds - (hours * 3600)
     local minutes = math.floor(totalSeconds / 60)
-    local seconds = totalSeconds - (minutes * 60)
+    local seconds = math.floor(totalSeconds - (minutes * 60))
     return doubleDigits(hours) .. ":" .. doubleDigits(minutes) .. ":" .. doubleDigits(seconds);
 end
 
@@ -280,17 +281,26 @@ local function calc_timeline(graphConfig)
 end
 
 local function recalculateGraph()
-    log("recalculateGraph()")
+    local t1 = getTime()*10
+
     calc_graph_params()
 
     for sensIdx = 1, MAX_SENSORS, 1 do
+        -- local t0 = getTime()*10
         sens_data[sensIdx].calc_graph_line(graphConfig) -- include clearLinePoints
+        -- log("recalculateGraph()/calc_graph_line(%d) done in %d ms",sensIdx, (getTime()*10 - t0))
     end
+
     calc_graph_cursor()
     calculate_scale_info()
+
+    -- local t0 = getTime()*10
     calc_timeline(graphConfig)
+    -- log("recalculateGraph()/calc_timeline() done in %d ms", (getTime()*10 - t0))
 
     graphConfig.needReLayout = false
+    is_recalc_state = false
+    log("recalculateGraph() done in %d ms", (getTime()*10 - t1))
 end
 
 
@@ -359,64 +369,6 @@ function M.state_SHOW_GRAPH_INIT()
                 end
             },
 
-            -- -- cusror position
-            -- {type="choice", x=LCD_W-220*lvSCALE, y=2, w=75*lvSCALE, h=32*lvSCALE, title="Cursor Position",
-            --     popupWidth = 30*lvSCALE,
-            --     values = {"<<<", "Center", ">>>"},
-            --     get = function() return cursor_data.cursor_pos_idx; end,
-            --     set = function(i)
-            --         log("Selected cursor position index: i=%d", i)
-            --         cursor_data.cursor_pos_idx = i
-
-            --         if i == 1 then
-            --             cursor_data.cursor_x = 20*lvSCALE
-            --         elseif i == 2 then
-            --             cursor_data.cursor_x = LCD_W /2
-            --         elseif i == 3 then
-            --             cursor_data.cursor_x = LCD_W - 30*lvSCALE
-            --         end
-            --         calc_graph_cursor()
-            --     end ,
-            -- },
-
-            -- -- zoom level
-            -- {type="choice", x=LCD_W-137*lvSCALE, y=2, w=50*lvSCALE, h=32*lvSCALE, title="Zoom",
-            --     popupWidth = 30*lvSCALE,
-            --     values = zoom_list,
-            --     get = function() return filter_zoom_level_idx; end,
-            --     set = function(i)
-            --         log("Selected zoom-level index: i=%d", i)
-            --         log("Selected zoom-level: %s", zoom_list[i])
-            --         filter_zoom_level = zoom_list[i]
-            --         filter_zoom_level_idx = i
-            --         log("Selected zoom-level: %s", filter_zoom_level)
-            --         graphConfig.reset_to_time = cursor_data.cursor_time_sec
-            --         graphConfig.zoomLevel = zoom_scale[i]
-            --         graphConfig.needReLayout = true
-            --     end ,
-            -- },
-
-            -- {type="button", x=LCD_W-120*lvSCALE, y=2*lvSCALE, h=30*lvSCALE, text="Info", color=BLACK, press=function() log("info button pressed") return 0 end},
-
-            -- {type="button", x=LCD_W-220*lvSCALE, y=2*lvSCALE, h=33*lvSCALE, text=" < ", color=BLACK,
-            --     press=function()
-            --         cursor_data.cursor_x = 15*lvSCALE
-            --         calc_graph_cursor()
-            --     end
-            -- },
-            -- {type="button", x=LCD_W-185*lvSCALE, y=2*lvSCALE, h=33*lvSCALE, text="  |  ", color=BLACK,
-            --     press=function()
-            --         cursor_data.cursor_x = LCD_W/2
-            --         calc_graph_cursor()
-            --     end
-            -- },
-            -- {type="button", x=LCD_W-145*lvSCALE, y=2*lvSCALE, h=33*lvSCALE, text=" > ", color=BLACK,
-            --     press=function()
-            --         cursor_data.cursor_x = LCD_W*0.85
-            --         calc_graph_cursor()
-            --     end
-            -- },
-
         }
     })
 
@@ -439,7 +391,13 @@ function M.state_SHOW_GRAPH_INIT()
             -- cursor_data.last_non_scroll_x = x
             -- cursor_data.last_non_scroll_y = y
 
-            if graphConfig.reset_to_time then
+            -- Only apply reset_to_time once recalculation is done (needReLayout = false).
+            -- scrollTo fires after every state_SHOW_GRAPH return (same firmware tick).
+            -- If a zoom just happened, needReLayout is still true here because
+            -- recalculateGraph() hasn't run yet ? xStep is still OLD.
+            -- Applying the scroll now would compute a wrong target x.
+            -- We wait until the next tick when recalculateGraph() has updated xStep.
+            if graphConfig.reset_to_time and not graphConfig.needReLayout then
                 local t = graphConfig.reset_to_time
                 graphConfig.reset_to_time = nil -- reset after use
                 -- scroll so that the cursor time stays under the cursor bar.
@@ -676,87 +634,35 @@ function M.state_SHOW_GRAPH_INIT()
         }
     })
 
+    lvgl.rectangle({
+        pos=function() return LCD_W/2 - 150*lvSCALE, LCD_H/2 - 40*lvSCALE end,
+        w=300*lvSCALE, h=80*lvSCALE,
+        filled=true, rounded=8, color=BLACK, opacity=220,
+        visible=function() return is_recalc_state end
+    })
+    lvgl.label({
+        pos=function() return LCD_W/2 - 100*lvSCALE, LCD_H/2 - 20*lvSCALE end,
+        color=WHITE, font=FS.FONT_16,
+        text=function() return string.format("Zoom: %s ...", filter_zoom_level) end,
+        visible=function() return is_recalc_state end
+    })
+
     return 0
 end
 
 local last_tap_time = -999  -- getTime() of last processed tap (units = 10 ms)
+local stick_ail_target_time = nil  -- private accumulator for aileron scroll; never overwritten by calc_graph_cursor
+local stick_rud_last_step_t = -999999 -- last rudder zoom step time in ms
 
 function M.state_SHOW_GRAPH(event, touchState)
     -- log("state_SHOW_GRAPH event: %s, touchState.tapCount: %s", event, touchState and touchState.tapCount or "---")
+
     -- show debug
     local switch_val = getValue('SA')
-    -- log("event: %s, adjust: %d", event, switch_val)
     show_dbg = switch_val > 1000
-
-    -- if event == EVT_TOUCH_FIRST then -- When the finger first hits the screen
-    --     -- If the finger hit the square, then stick to it!
-
-    --     -- log("1=%s (%s %s)", (touchState.x > cursor_data.cursor_x), touchState.x, cursor_data.cursor_x)
-    --     -- log("2=%s", (touchState.x < cursor_data.cursor_x + cursor_data.labels_box.dx + cursor_data.labels_box.w))
-    --     -- log("3=%s", (touchState.y > cursor_data.labels_box.y))
-    --     -- log("4=%s", (touchState.y < cursor_data.labels_box.y + cursor_data.labels_box.h))
-    --     log("1=%s (%s %s)", (touchState.x > 0), touchState.x, cursor_data.cursor_x)
-    --     log("2=%s", (touchState.x < cursor_data.cursor_x + cursor_data.labels_box.dx + cursor_data.labels_box.w))
-    --     log("3=%s", (touchState.y > 0))
-    --     log("4=%s", (touchState.y < cursor_data.labels_box.y + cursor_data.labels_box.h))
+    -- show_dbg = false -- disable debug for now
 
 
-    --     if      (touchState.x > 0)
-    --         and (touchState.x < cursor_data.cursor_x + cursor_data.labels_box.dx + cursor_data.labels_box.w)
-    --         and (touchState.y > 0) and (touchState.y < cursor_data.labels_box.y + cursor_data.labels_box.h)
-    --         then
-    --             cursor_data.is_dragging = true
-    --             log("touch near cursor: x=%d, y=%d", touchState.x, touchState.y)
-    --     end
-    --     -- stick = (math.abs(touchState.x - x) < 0.5 * s and math.abs(touchState.y - y) < 0.5 * s)
-    -- end
-
-    -- if event == EVT_TOUCH_SLIDE then
-    --     cursor_data.cursor_x = touchState.x
-    --     log("slide: x=%d, y=%d, slideX=%d, slideY=%d", touchState.x, touchState.y, touchState.slideX, touchState.slideY)
-    -- end
-
-    -- if event == EVT_TOUCH_BREAK then -- When the finger first hits the screen
-    --     cursor_data.is_dragging = false
-    -- end
-    -- if cursor_data.is_dragging == true then
-    --     log("cursor_data.is_dragging: %s", cursor_data.is_dragging)
-    -- end
-
-    -- detect tap on graph area
-    -- if event == EVT_TOUCH_TAP and touchState and touchState.tapCount==1 then
-    --     cursor_data.visible = not cursor_data.visible
-    --     log("tap on graph: x=%d, y=%d, cursor-visible=%s", touchState.x, touchState.y, cursor_data.visible)
-    -- end
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    -- -- track physical touch start (fires exactly once per finger-down)
-    -- if event == EVT_TOUCH_FIRST then
-    --     tap_count = tap_count + 1
-    -- end
-    -- -- detect tap on graph area - guarded by time to suppress duplicate CLICKEDs
-    -- local TAP_DEBOUNCE = 100  -- 30 x 10 ms = 300 ms
-    -- if event == EVT_TOUCH_TAP and touchState and (getTime() - last_tap_time) > TAP_DEBOUNCE then
-    --     tap_count = tap_count + 10
-    --     last_tap_time = getTime()
-    --     cursor_data.visible = not cursor_data.visible
-    --     cursor_data.cursor_x = touchState.x
-    --     log("tap: time=%d, x=%d, y=%d, visible=%s", last_tap_time, touchState.x, touchState.y, cursor_data.visible)
-    -- end
 
     if event == EVT_TOUCH_TAP then
         cursor_data.visible = true
@@ -765,41 +671,58 @@ function M.state_SHOW_GRAPH(event, touchState)
     end
 
 
-    -- -- zoom graph
-    -- local amount = 0 - getValue('ele')
-    -- if math.abs(amount) > 100 then
-    --     local scale
-    --     if graphConfig.zoomLevel < 10 then
-    --         scale = 0.4
-    --     elseif graphConfig.zoomLevel < 30 then
-    --         scale = 0.6
-    --     else
-    --         scale = math.max(graphConfig.zoomLevel / 10, 1)
-    --     end
-    --     local delta = amount / 1024 * scale
-    --     graphConfig.zoomLevel = graphConfig.zoomLevel + delta
-    --     graphConfig.zoomLevel = math.max(graphConfig.zoomLevel, 5)
-    --     graphConfig.zoomLevel = math.min(graphConfig.zoomLevel, 100)
-    --     log("zoomLevel: %d (amount: %d, delta: %d)", graphConfig.zoomLevel, amount, delta)
+    -- rudder stick zooms the graph (two speed zones, time-gated discrete steps)
+    --   dead zone  : |rud| < 100          -> no action
+    --   middle zone: 100 <= |rud| < 700   -> 1 step every 0.5 s
+    --   top zone   : |rud| >= 700         -> 2 steps every 0.5 s
+    local rud_amount = 0 - getValue('rud')  -- invert: stick UP -> positive -> zoom in
+    local RUD_DEAD_ZONE     = 100
+    local RUD_TOP_ZONE      = 700   -- above this = top (fast) zone
+    local RUD_INTERVAL      = 500   -- 500 ms between steps (same for both zones)
+    if math.abs(rud_amount) > RUD_DEAD_ZONE then
+        local steps = (math.abs(rud_amount) >= RUD_TOP_ZONE) and 2 or 1
+        local now = getTime() * 10  -- convert 10-ms ticks to milliseconds
+        if (now - stick_rud_last_step_t) >= RUD_INTERVAL then
+            local dir = (rud_amount > 0) and -1 or 1
+            filter_zoom_level_idx = math.max(1, math.min(#zoom_list, filter_zoom_level_idx + dir * steps))
+            filter_zoom_level = zoom_list[filter_zoom_level_idx]
+            graphConfig.zoomLevel = zoom_scale[filter_zoom_level_idx]
+            graphConfig.reset_to_time = cursor_data.cursor_time_sec
+            graphConfig.needReLayout = true
+            stick_rud_last_step_t = now
+            log("rud zoom: idx=%d (%s) steps=%d", filter_zoom_level_idx, filter_zoom_level, steps)
+        end
+    else
+        stick_rud_last_step_t = -999999  -- reset: next stick press fires the first step immediately
+    end
 
-    --     graphConfig.reset_to_time = cursor_data.cursor_time_sec
-    --     graphConfig.needReLayout = true
-    -- end
-
-    -- local adjust = getValue('ail')
-    -- if math.abs(adjust) > 100 then
-    --     graphConfig.reset_to_time = cursor_data.cursor_time_sec + adjust / 1000 --/ graphTimeBase
-    --     graphConfig.needReLayout = true
-    -- end
+    -- aileron stick scrolls the graph (no recalculation, just reposition)
+    -- ail_target_time is a private accumulator; calc_graph_cursor resets cursor_time_sec to floor()
+    -- each frame which would cancel our delta if we used cursor_time_sec as the base.
+    local adjust = getValue('ail')
+    if math.abs(adjust) > 100 then
+        if stick_ail_target_time == nil then
+            stick_ail_target_time = cursor_data.cursor_time_sec  -- anchor to current position on first frame
+        end
+        local scroll_delta = (adjust / 1024) * 1.20  -- log-seconds per frame; tune if needed
+        stick_ail_target_time = stick_ail_target_time + scroll_delta
+        graphConfig.reset_to_time = stick_ail_target_time
+    else
+        stick_ail_target_time = nil  -- release: re-sync to cursor position next time stick is used
+    end
 
     -- local x, y = bGraph:getScrollPos()
     -- log("run_GRAPH_Adjust: scroll: %sx%s", x,y)
 
-    if graphConfig.needReLayout then
-        recalculateGraph()
-    end
 
-    -- log("load: %s%%", getUsage())
+    if graphConfig.needReLayout then
+        if is_recalc_state then
+            recalculateGraph()
+        else
+            is_recalc_state = true
+            return
+        end
+    end
 
     return 0
 end
