@@ -60,7 +60,7 @@ local graphConfig = {
     x_scrool = 0,
     center_pos = {x=0, y=0},
     y_start = 40,
-    y_end = is800 and 390 or 210,
+    y_end = is800 and 430 or 230,
     xStep = 1,
     zoom_level_idx = DEFAULT_ZOOM_IDX,
     zoom_level_txt = zoom_list_txt[DEFAULT_ZOOM_IDX],
