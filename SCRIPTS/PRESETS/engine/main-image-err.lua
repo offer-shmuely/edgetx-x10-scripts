@@ -2,9 +2,6 @@ local app_name = "PresetsLoader"
 
 local app_folder    = "/SCRIPTS/PRESETS"
 
--- better font names
-local FS={FONT_38=XXLSIZE,FONT_16=DBLSIZE,FONT_12=MIDSIZE,FONT_8=0,FONT_6=SMLSIZE}
-
 local function init()
     lvgl.clear()
     lvgl.build({
