@@ -48,30 +48,23 @@ local filename = "---"
 local show_dbg = false
 local show_settings = false
 local is_recalc_state = false
-local scale_info = {
-    w = 40,
-    label = "?"
-}
+local is_min_max_on_window = false
 
 local timeline_marks = {}
 
+local zoom_list_txt  = {"1x", "2x", "4x", "6x", "8x", "10x", "20x", "30x"}
+local zoom_list_scale = { 10 ,  20 ,  40 ,  60 ,  80 ,  100 ,  200 ,  300}
 local DEFAULT_ZOOM_IDX = 2
-
--- local zoom_list  = {"1x", "2x", "3x", "4x", "5x", "6x", "7x", "8x", "9x", "10x"}
--- local zoom_scale = {  10,   20,   30,   40,   50,   60,   70,   80,   90,   100}
-local zoom_list  = {"1x", "2x", "4x", "6x", "8x", "10x"}
-local zoom_scale = { 10 ,  20 ,  40 ,  60 ,  80 ,  100 }
-local filter_zoom_level = zoom_list[DEFAULT_ZOOM_IDX]
-local filter_zoom_level_idx = DEFAULT_ZOOM_IDX
-local DEFAULT_ZOOM_LEVEL = zoom_scale[DEFAULT_ZOOM_IDX]
 
 local graphConfig = {
     x_scrool = 0,
     center_pos = {x=0, y=0},
     y_start = 40,
-    y_end = is800 and 430 or 230,
+    y_end = is800 and 390 or 210,
     xStep = 1,
-    zoomLevel = DEFAULT_ZOOM_LEVEL,
+    zoom_level_idx = DEFAULT_ZOOM_IDX,
+    zoom_level_txt = zoom_list_txt[DEFAULT_ZOOM_IDX],
+    zoom_level_scale = zoom_list_scale[DEFAULT_ZOOM_IDX],
     reset_to_time = nil,
     height = is800 and 400 or 200,
     needReLayout = false,
@@ -130,7 +123,7 @@ function M.init(graphTimeBase1, sens1, sens2, sens3, sens4, filename1)
     for sensIdx = 1, MAX_SENSORS, 1 do
         sens_data[sensIdx].clearLinePoints()
     end
-    graphConfig.zoomLevel = DEFAULT_ZOOM_LEVEL -- reset zoom level
+    graphConfig.zoom_level_scale = zoom_list_scale[DEFAULT_ZOOM_IDX] -- reset zoom level
 end
 
 local function doubleDigits(value)
@@ -149,10 +142,31 @@ local function toDuration1(totalSeconds)
     return doubleDigits(hours) .. ":" .. doubleDigits(minutes) .. ":" .. doubleDigits(seconds);
 end
 
+local function toDuration_tenths(totalSeconds)
+    local tenths = math.floor(totalSeconds % 1 * 10)
+    return toDuration1(totalSeconds) .. "." .. tenths
+end
+
+local function formatNumerCompressed(sensor, value)
+    if value == nil then return "--" end
+
+    -- if sensor.sensorName == "RxBat" then return string.format("%.2f", value) end
+    -- if sensor.sensorName == "TxBat" then return string.format("%.2f", value) end
+    if sensor.precision == 1 then return string.format("%.1f", value) end
+    if sensor.precision == 2 then return string.format("%.2f", value) end
+    if sensor.precision == 3 then return string.format("%.3f", value) end
+
+    if value > 0 and value < 10 then
+        return string.format("%.1f", value)
+    else
+        return string.format("%d", value)
+    end
+end
+
 local function calc_graph_params()
     local minStep = 0.3
     local maxStep = 10
-    graphConfig.xStep = minStep + (graphConfig.zoomLevel - 1) * (maxStep - minStep) / 99
+    graphConfig.xStep = minStep + (graphConfig.zoom_level_scale - 1) * (maxStep - minStep) / 99
 end
 
 local function calc_graph_cursor()
@@ -162,7 +176,7 @@ local function calc_graph_cursor()
     local cursorFrac = (cursorX - graphConfig.valPos2x(cursorValPos)) / graphConfig.xStep
 
     if graphConfig.reset_to_time == nil then
-        cursor_data.cursor_time_sec = math.floor(cursorValPos / graphTimeBase)
+        cursor_data.cursor_time_sec = math.floor(cursorValPos / graphTimeBase * 10) / 10
     end
     -- log("calc_graph_cursor cursor_time_sec: %s, cursorValPos: %s, cursorFrac: %.2f", cursor_data.cursor_time_sec, cursorValPos, cursorFrac)
 
@@ -176,16 +190,22 @@ local function calc_graph_cursor()
             goto continue -- poor man continue
         end
 
-        -- cursor values
+        -- estimate the y between two points (linear interpolation)
         local y0 = sens_data[sensIdx].line_points[cursorValPos][2]
         local pt1 = sens_data[sensIdx].line_points[cursorValPos + 1]
         local c_y = pt1 and (y0 + cursorFrac * (pt1[2] - y0)) or y0
 
-        sens_data[sensIdx].cursor_y = c_y
+        -- estimate the value between two points (linear interpolation)
+        local v0 = sens_data[sensIdx].raw_values[cursorValPos]
+        local v1 = sens_data[sensIdx].raw_values[cursorValPos + 1]
+        local c_val = v1 and (v0 + cursorFrac * (v1 - v0)) or v0
+        -- local c_val = sens_data[sensIdx].raw_values[cursorValPos]
 
+        -- cursor values
+        sens_data[sensIdx].cursor_y = c_y
         cursor_data.vals[sensIdx].x1 = cursor_data.cursor_x + 30
         cursor_data.vals[sensIdx].y1 = 120 + 25 * sensIdx
-        cursor_data.vals[sensIdx].v_txt = sens_data[sensIdx].sensorName .. ": " .. sens_data[sensIdx].raw_values[cursorValPos] .. sens_data[sensIdx].unit
+        cursor_data.vals[sensIdx].v_txt = sens_data[sensIdx].sensorName .. ": " .. formatNumerCompressed(sens_data[sensIdx], c_val) .. sens_data[sensIdx].unit
         cursor_data.vals[sensIdx].txt_w, cursor_data.vals[sensIdx].txt_h = lcd.sizeText(cursor_data.vals[sensIdx].v_txt)
         cursor_data.vals[sensIdx].txt_w = math.max(cursor_data.vals[sensIdx].txt_w, 40)
 
@@ -212,34 +232,6 @@ local function calc_graph_cursor()
     end
 
     -- table_explorer.print(cursor_data, "cursor_data")
-end
-
-local function calculate_scale_info()
-    local max_w = math.floor(LCD_W / 3)
-    local px_per_sec = graphConfig.xStep * graphTimeBase
-    if px_per_sec <= 0 then
-        scale_info.w = 40 * lvSCALE
-        scale_info.label = "?"
-        return
-    end
-    local nice_durations = {5, 10, 15, 20, 30, 60, 120, 180, 300, 600, 900, 1200, 1800, 3600}
-    local chosen_sec = nice_durations[1]
-    local chosen_w = math.floor(px_per_sec * chosen_sec)
-    for i = 1, #nice_durations do
-        local w = math.floor(px_per_sec * nice_durations[i])
-        if w <= max_w then
-            chosen_sec = nice_durations[i]
-            chosen_w = w
-        else
-            break
-        end
-    end
-    if chosen_sec < 60 then
-        scale_info.label = string.format("%d sec", chosen_sec)
-    else
-        scale_info.label = string.format("%d min", chosen_sec / 60)
-    end
-    scale_info.w = math.max(chosen_w, 5 * lvSCALE)
 end
 
 local function calc_timeline(graphConfig)
@@ -280,6 +272,23 @@ local function calc_timeline(graphConfig)
     end
 end
 
+local function calc_window_minmax(sensIdx)
+    local start_pos = math.max(1, graphConfig.x2valPos(graphConfig.x_scrool))
+    local end_pos = graphConfig.x2valPos(graphConfig.x_scrool + LCD_W)
+    local rv = sens_data[sensIdx].raw_values
+    local w_min, w_max = math.huge, -math.huge
+    for i = start_pos, end_pos do
+        local v = rv[i]
+        if v then
+            if v > w_max then w_max = v end
+            if v < w_min then w_min = v end
+        end
+    end
+    if w_min == math.huge then w_min = 0 end
+    if w_max == -math.huge then w_max = 0 end
+    return w_min, w_max
+end
+
 local function recalculateGraph()
     local t1 = getTime()*10
 
@@ -292,7 +301,6 @@ local function recalculateGraph()
     end
 
     calc_graph_cursor()
-    calculate_scale_info()
 
     -- local t0 = getTime()*10
     calc_timeline(graphConfig)
@@ -339,24 +347,24 @@ function M.state_SHOW_GRAPH_INIT()
             {type="button", x=LCD_W-160*lvSCALE, w=50*lvSCALE, y=2, h=33*lvSCALE, text=" + + + ",
                 press=function()
                     log("zoom button + pressed")
-                    filter_zoom_level_idx = filter_zoom_level_idx + 1
-                    filter_zoom_level_idx = math.min(filter_zoom_level_idx, #zoom_list)
-                    filter_zoom_level = zoom_list[filter_zoom_level_idx]
-                    log("Selected zoom-level: %s", filter_zoom_level)
+                    graphConfig.zoom_level_idx = graphConfig.zoom_level_idx + 1
+                    graphConfig.zoom_level_idx = math.min(graphConfig.zoom_level_idx, #zoom_list_txt)
+                    graphConfig.zoom_level_txt = zoom_list_txt[graphConfig.zoom_level_idx]
+                    log("Selected zoom-level: %s", graphConfig.zoom_level_txt)
                     graphConfig.reset_to_time = cursor_data.cursor_time_sec
-                    graphConfig.zoomLevel = zoom_scale[filter_zoom_level_idx]
+                    graphConfig.zoom_level_scale = zoom_list_scale[graphConfig.zoom_level_idx]
                     graphConfig.needReLayout = true
                 end
             },
             {type="button", x=LCD_W-220*lvSCALE, w=50*lvSCALE, y=2, h=33*lvSCALE, text=" - - - ",
                 press=function()
                     log("zoom button - pressed")
-                    filter_zoom_level_idx = filter_zoom_level_idx - 1
-                    filter_zoom_level_idx = math.max(filter_zoom_level_idx, 1)
-                    filter_zoom_level = zoom_list[filter_zoom_level_idx]
-                    log("Selected zoom-level: %s", filter_zoom_level)
+                    graphConfig.zoom_level_idx = graphConfig.zoom_level_idx - 1
+                    graphConfig.zoom_level_idx = math.max(graphConfig.zoom_level_idx, 1)
+                    graphConfig.zoom_level_txt = zoom_list_txt[graphConfig.zoom_level_idx]
+                    log("Selected zoom-level: %s", graphConfig.zoom_level_txt)
                     graphConfig.reset_to_time = cursor_data.cursor_time_sec
-                    graphConfig.zoomLevel = zoom_scale[filter_zoom_level_idx]
+                    graphConfig.zoom_level_scale = zoom_list_scale[graphConfig.zoom_level_idx]
                     graphConfig.needReLayout = true
                 end
             },
@@ -413,28 +421,6 @@ function M.state_SHOW_GRAPH_INIT()
         end
     })
 
-
-
-    -- -- dynamic scale indicator (like google maps)
-    -- lvgl.box({x=math.floor(LCD_W/2 - LCD_W/7), y=TIMELINE_Y - 30 * lvSCALE,
-    --     children={
-    --         {type="label", font=FS.FONT_6, color=LIGHTGREY, text=function() return scale_info.label end,
-    --             pos=function() return scale_info.w/2 -20, 0 end
-    --         },
-    --         {type="hline", color=LIGHTGREY,
-    --             pos=function() return 0, 18*lvSCALE end,
-    --             size=function() return scale_info.w, 2*lvSCALE end
-    --         },
-    --         {type="vline", color=LIGHTGREY,
-    --             pos=function() return 0, 11*lvSCALE end,
-    --             size=function() return 2 * lvSCALE, 12*lvSCALE end
-    --         },
-    --         {type="vline", color=LIGHTGREY,
-    --             pos=function() return scale_info.w, 11*lvSCALE end,
-    --             size=function() return 2 * lvSCALE, 12*lvSCALE end
-    --         },
-    --     }
-    -- })
 
     -- timeline ticks & labels
     -- timeline
@@ -499,6 +485,16 @@ function M.state_SHOW_GRAPH_INIT()
         visible=function() return cursor_data.visible end
     })
 
+    -- zoom level
+    lvgl.label({color=WHITE, font=FS.FONT_8,
+        x=LCD_W-80*lvSCALE, y=gArea_y,
+        text=function()
+            return string.format("Zoom: %s", graphConfig.zoom_level_txt)
+        end,
+    })
+
+
+
     -- cursor line
     local y_c_line = 20*lvSCALE
     lvgl.vline({w=1*lvSCALE, h=gArea_h-y_c_line-20*lvSCALE, dashGap=5, dashWidth=5, color=WHITE,
@@ -510,7 +506,7 @@ function M.state_SHOW_GRAPH_INIT()
     lvgl.label({color=WHITE, font=FS.FONT_8,
         pos=function() return cursor_data.cursor_x-17*lvSCALE, gArea_y end,
         text=function()
-            local str_time = toDuration1(cursor_data.cursor_time_sec)
+            local str_time = toDuration_tenths(cursor_data.cursor_time_sec)
             if cursor_data.cursor_time_sec < 3600 then
                 str_time = string.sub(str_time, 4)
             end
@@ -552,8 +548,10 @@ function M.state_SHOW_GRAPH_INIT()
 
             lvgl.line({
                 pts=function() return {
-                    {cursor_data.cursor_x, gArea_y + (sens_data[sensIdx].cursor_y or 0)},  -- vline side
-                    {cursor_data.cursor_x + 50*lvSCALE, valLabel_y_base + cursor_data.vals[sensIdx].rank * 25*lvSCALE + 12*lvSCALE}  -- label side
+                    -- vline side
+                    {cursor_data.cursor_x, gArea_y + (sens_data[sensIdx].cursor_y or 0)},
+                    -- label side
+                    {cursor_data.cursor_x + 50*lvSCALE, valLabel_y_base + cursor_data.vals[sensIdx].rank * 25*lvSCALE + 12*lvSCALE}
                 }
                 end,
                 color=function() return graphConfigSens[sensIdx].color end,
@@ -563,7 +561,7 @@ function M.state_SHOW_GRAPH_INIT()
 
             lvgl.circle({
                 pos=function()
-                    return cursor_data.cursor_x, gArea_y + (sens_data[sensIdx].cursor_y or 0)
+                    return cursor_data.cursor_x, gArea_y + (sens_data[sensIdx].cursor_y or 0) -- vline side
                 end,
                 radius=4*lvSCALE,
                 color=graphConfigSens[sensIdx].color,
@@ -579,17 +577,60 @@ function M.state_SHOW_GRAPH_INIT()
     local settings_h = LCD_H - header_h
     local settings_w = 150*lvSCALE
     local h = 60*lvSCALE
-    local bSettings=lvgl.box({x=LCD_W-settings_w, y=header_h, w=settings_w, h=settings_h, visible=function() return show_settings end})
-    for sensIdx = 1, MAX_SENSORS, 1 do
-        local y_pos = 5*lvSCALE + (sensIdx-1)*(h+5*lvSCALE)
+    local bSettings=lvgl.box({x=LCD_W-settings_w+0, y=header_h, w=settings_w, h=settings_h, visible=function() return show_settings end})
 
-        bSettings:box({x=0, y=y_pos, w=settings_w, h=200,visible=function() return show_settings end,
+
+    -- settings min/max on window
+    bSettings:box({x=0, y=4*lvSCALE, w=settings_w, h=200*lvSCALE,visible=function() return show_settings end,
+        children={
+            {type="rectangle", x=0, y=0, w=settings_w-2*settings_dx, h=40*lvSCALE, color=WHITE, filled=true, rounded=5, opacity=240},
+            {type="label",     x=5*lvSCALE, y=2*lvSCALE, text="window\nmin/max", color=BLACK, font=FS.FONT_6},
+            {type="toggle", x=settings_w-65*lvSCALE, y=4*lvSCALE,
+                get = function()
+                    return (is_min_max_on_window==true and 1 or 0)
+                end,
+                set = function(i)
+                    is_min_max_on_window = (i==1) and true or false
+                end ,
+            },
+        }
+    })
+
+
+    -- settings per sensor
+    for sensIdx = 1, MAX_SENSORS, 1 do
+        local y_pos = 50*lvSCALE + (sensIdx-1)*(h+5*lvSCALE)
+
+        bSettings:box({x=0, y=y_pos, w=settings_w, h=200*lvSCALE,visible=function() return show_settings end,
             children={
                 {type="rectangle", x=0, y=0, w=settings_w-2*settings_dx, h=h, color=graphConfigSens[sensIdx].color, filled=true, rounded=5, opacity=240},
-                -- {type="label",     x=5*lvSCALE, y=2*lvSCALE, text=function() return string.format("[%s] %d-%d %s", sens_data[sensIdx].sensorName, sens_data[sensIdx].min, sens_data[sensIdx].max, sens_data[sensIdx].unit) end, color=BLACK, font=FS.FONT_8},
-                {type="label",     x=5*lvSCALE, y=2*lvSCALE, text=function() return string.format("%s [%s]", sens_data[sensIdx].sensorName, sens_data[sensIdx].unit) end, color=BLACK, font=FS.FONT_8},
-                {type="label",     x=5*lvSCALE, y=20*lvSCALE, text=function() return string.format("Max: %d %s", sens_data[sensIdx].max, sens_data[sensIdx].unit) end, color=BLACK, font=FS.FONT_6},
-                {type="label",     x=5*lvSCALE, y=36*lvSCALE, text=function() return string.format("Min: %d %s", sens_data[sensIdx].min, sens_data[sensIdx].unit) end, color=BLACK, font=FS.FONT_6},
+                -- {type="label", x=5*lvSCALE, y=2*lvSCALE, text=function() return string.format("[%s] %d-%d %s", sens_data[sensIdx].sensorName, sens_data[sensIdx].min, sens_data[sensIdx].max, sens_data[sensIdx].unit) end, color=BLACK, font=FS.FONT_8},
+
+                -- sensor name
+                {type="label", x=5*lvSCALE, y=2*lvSCALE, text=function() return (sens_data[sensIdx].unit~="") and string.format("%s [%s]", sens_data[sensIdx].sensorName, sens_data[sensIdx].unit) or string.format("%s", sens_data[sensIdx].sensorName)end, color=BLACK, font=FS.FONT_8},
+
+                   -- min
+                {type="label", x=5*lvSCALE, y=36*lvSCALE, color=BLACK, font=FS.FONT_6,
+                        text=function()
+                            if is_min_max_on_window then
+                                local w_min = calc_window_minmax(sensIdx)
+                                return string.format("Min: %s %s", formatNumerCompressed(sens_data[sensIdx], w_min), sens_data[sensIdx].unit)
+                            end
+                            return string.format("Min: %s %s", formatNumerCompressed(sens_data[sensIdx], sens_data[sensIdx].min), sens_data[sensIdx].unit)
+                        end
+                   },
+
+                   -- max
+                {type="label", x=5*lvSCALE, y=20*lvSCALE, color=BLACK, font=FS.FONT_6,
+                        text=function()
+                            if is_min_max_on_window then
+                                local _, w_max = calc_window_minmax(sensIdx)
+                                return string.format("Max: %s %s", formatNumerCompressed(sens_data[sensIdx], w_max), sens_data[sensIdx].unit)
+                            end
+                            return string.format("Max: %s %s", formatNumerCompressed(sens_data[sensIdx], sens_data[sensIdx].max), sens_data[sensIdx].unit)
+                        end
+                   },
+
 
                 -- {type="button", x=20*lvSCALE, y=25*lvSCALE, h=25*lvSCALE, text="-", color=BLACK,
                 --     press=function()
@@ -613,7 +654,7 @@ function M.state_SHOW_GRAPH_INIT()
                         sens_data[sensIdx].visible = (i==1) and true or false
                     end ,
                 },
-             }
+            }
         })
     end
 
@@ -626,7 +667,6 @@ function M.state_SHOW_GRAPH_INIT()
     lvgl.box({x=10, y=150, visible=function() return show_dbg end,
         children={
             -- {type="label", x=0, y=0,  text=function() return string.format("graph: start: %d, graphSize: %d", graphStart, graphSize) end, font=FS.FONT_6, color=LIGHTGREY},
-            {type="label", x=0, y=15*lvSCALE, text=function() return string.format("graph: zoomLevel: %.2f", graphConfig.zoomLevel) end, font=FS.FONT_6, color=LIGHTGREY},
             {type="label", x=0, y=30*lvSCALE, text=function() return string.format("graph: xStep: %.2f", sens_data[1].xStep) end, font=FS.FONT_6, color=LIGHTGREY},
             {type="label", x=0, y=45*lvSCALE, text=function() return string.format("load: %s%%", getUsage()) end, font=FS.FONT_6, color=LIGHTGREY},
             {type="label", x=0, y=60*lvSCALE, text=function() return string.format("cursor: x=%s, time=%s", cursor_data.cursor_pos_idx, cursor_data.cursor_time_sec) end, font=FS.FONT_6, color=LIGHTGREY},
@@ -643,7 +683,7 @@ function M.state_SHOW_GRAPH_INIT()
     lvgl.label({
         pos=function() return LCD_W/2 - 100*lvSCALE, LCD_H/2 - 20*lvSCALE end,
         color=WHITE, font=FS.FONT_16,
-        text=function() return string.format("Zoom: %s ...", filter_zoom_level) end,
+        text=function() return string.format("Zoom: %s ...", graphConfig.zoom_level_txt) end,
         visible=function() return is_recalc_state end
     })
 
@@ -666,7 +706,9 @@ function M.state_SHOW_GRAPH(event, touchState)
 
     if event == EVT_TOUCH_TAP then
         cursor_data.visible = true
-        cursor_data.cursor_x = touchState.x
+        local max_cursor_box_width = cursor_data.labels_box.dx + cursor_data.labels_box.w
+        local max_cursor_box_pos = LCD_W - max_cursor_box_width
+        cursor_data.cursor_x = math.min(touchState.x, max_cursor_box_pos)  -- avoid going out of bounds on the right side (cursor labels box)
         log("tap: x=%d, y=%d, visible=%s", touchState.x, touchState.y, cursor_data.visible)
     end
 
@@ -684,13 +726,13 @@ function M.state_SHOW_GRAPH(event, touchState)
         local now = getTime() * 10  -- convert 10-ms ticks to milliseconds
         if (now - stick_rud_last_step_t) >= RUD_INTERVAL then
             local dir = (rud_amount > 0) and -1 or 1
-            filter_zoom_level_idx = math.max(1, math.min(#zoom_list, filter_zoom_level_idx + dir * steps))
-            filter_zoom_level = zoom_list[filter_zoom_level_idx]
-            graphConfig.zoomLevel = zoom_scale[filter_zoom_level_idx]
+            graphConfig.zoom_level_idx = math.max(1, math.min(#zoom_list_txt, graphConfig.zoom_level_idx + dir * steps))
+            graphConfig.zoom_level_txt = zoom_list_txt[graphConfig.zoom_level_idx]
+            graphConfig.zoom_level_scale = zoom_list_scale[graphConfig.zoom_level_idx]
             graphConfig.reset_to_time = cursor_data.cursor_time_sec
             graphConfig.needReLayout = true
             stick_rud_last_step_t = now
-            log("rud zoom: idx=%d (%s) steps=%d", filter_zoom_level_idx, filter_zoom_level, steps)
+            log("rud zoom: idx=%d (%s) steps=%d", graphConfig.zoom_level_idx, graphConfig.zoom_level_txt, steps)
         end
     else
         stick_rud_last_step_t = -999999  -- reset: next stick press fires the first step immediately

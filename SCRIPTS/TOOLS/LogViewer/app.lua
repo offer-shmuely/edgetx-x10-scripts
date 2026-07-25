@@ -35,7 +35,7 @@ local M = {}
 -- run the script ...
 -- send me the log file that will be created on: /SCRIPTS/TOOLS/LogViewer/app.log
 
-local app_ver = "2.6"
+local app_ver = "2.7"
 
 local lvSCALE = lvgl.LCD_SCALE or 1
 local is800 = (LCD_W==800)
@@ -147,11 +147,26 @@ local function compare_dates_inc(a, b)
     return a < b
 end
 local function compare_dates_dec(a, b)
-    return a < b
+    return a > b
 end
 
 local function compare_names(a, b)
     return a < b
+end
+
+local function parse_file_name(file_name)
+    local FILE_NAME_PATTERN_1 = "^(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv$"
+    local FILE_NAME_PATTERN_DAY = "^(.*)-(%d+)-(%d+)-(%d+).csv$"
+
+    local modelName, year, month, day, hour, min, sec = string.match(file_name, FILE_NAME_PATTERN_1)
+    if modelName == nil then
+        -- try all-day logs
+        modelName, year, month, day = string.match(file_name, FILE_NAME_PATTERN_DAY)
+        hour = 0
+        min = 0
+        sec = 0
+    end
+    return modelName, year, month, day, hour, min, sec
 end
 
 local function get_log_files_last_fly_date()
@@ -160,7 +175,7 @@ local function get_log_files_last_fly_date()
     local on_disk_date_list = {}
     local last_log_day_time = "1970-01-01-00-00-00"
     for fn in dir("/LOGS") do
-        local modelName, year, month, day, hour, min, sec, m, d, y = string.match(fn, "^(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv$")
+        local modelName, year, month, day, hour, min, sec = parse_file_name(fn)
         if year~=nil and month~=nil and day~=nil then
             local log_day = string.format("%s-%s-%s", year, month, day)
             local log_day_time = string.format("%s-%s-%s-%s-%s-%s", year, month, day, hour, min, sec)
@@ -196,7 +211,7 @@ local function get_log_files_list()
     for fn in dir("/LOGS") do
         --log("fn: %s", fn)
 
-        local modelName, year, month, day, hour, min, sec, m, d, y = string.match(fn, "^(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv$")
+        local modelName, year, month, day, hour, min, sec = parse_file_name(fn)
         local log_day = string.format("%s-%s-%s", year, month, day)
         local log_day_time = string.format("%s-%s-%s-%s-%s-%s", year, month, day, hour, min, sec)
 
@@ -352,7 +367,7 @@ local function create_log_file_list()
 
     for i = 1, #log_files_index_info do
         local log_file_info = log_files_index_info[i]
-        local modelName, year, month, day, hour, min, sec, m, d, y = string.match(log_file_info.file_name, "^(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv$")
+        local modelName, year, month, day, hour, min, sec = parse_file_name(log_file_info.file_name)
 
         local is_duration_ok = (log_file_info.total_seconds >= min_log_sec_to_show)
         local is_have_data_ok = (log_file_info.col_with_data_str ~= nil) and (log_file_info.col_with_data_str ~= "")
@@ -387,7 +402,7 @@ local function filter_log_file_list(filter_model_name, need_update)
 
     for i = 1, #log_file_list_fullinfo do
         local log_file_info = log_file_list_fullinfo[i]
-        local modelName, year, month, day, hour, min, sec, m, d, y = string.match(log_file_info.file_name, "^(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv$")
+        local modelName, year, month, day, hour, min, sec = parse_file_name(log_file_info.file_name)
 
         local is_model_name_needed
         if filter_model_name == nil or string.sub(filter_model_name, 1, 2) == "--" then
@@ -585,8 +600,9 @@ local function state_INDEX_FILES(event, touchState)
 
             log("log file: (%d/%d) %s (detecting...)", log_file_list_raw_idx, #log_file_list_raw, filename)
 
-            local modelName, year, month, day, hour, min, sec, m, d, y = string.match(filename, "^(.*)-(%d+)-(%d+)-(%d+)-(%d%d)(%d%d)(%d%d).csv$")
+            local modelName, year, month, day, hour, min, sec = parse_file_name(filename)
             if modelName == nil then
+                log("log file: (%d/%d) %s (model_name=nil)", log_file_list_raw_idx, #log_file_list_raw, filename)
                 goto continue
             end
             --log("log file: %s (is csv)", fileName)

@@ -179,6 +179,7 @@ function M.getFileDataInfo(file_name)
     local start_time, end_time, total_seconds, total_lines, start_index, col_with_data_str, all_col_str = M.m_lib_file_parser.getFileDataInfo(file_name)
 
     if start_time == nil then
+        log("getFileDataInfo: file have no data:  %s", file_name)
         return false, nil, nil, nil, nil, nil, nil, nil
     end
 

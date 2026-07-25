@@ -86,6 +86,7 @@ function M.init(sensIdx, colId, columnName)
     M.sensorName = "---"
     M.name = "---"
     M.unit = "---"
+    M.precision = 0
     M.conversionProgress = -1
 
     M.raw_values = {}
@@ -106,9 +107,29 @@ function M.init(sensIdx, colId, columnName)
         M.sensorName = columnName
         M.unit = ""
     end
+
+    -- choose precision based on sensor name
+    if     M.sensorName == "RxBat"
+        or M.sensorName == "TxBat"
+        or M.sensorName == "Batt"
+        or M.sensorName == "Vcel"
+        or M.sensorName == "Vbec"
+        or M.sensorName == "Vbat"
+        or M.sensorName == "Cell"
+        or M.sensorName == "Cell"
+        or M.sensorName == "cel1"
+        or M.sensorName == "cel2"
+        or M.sensorName == "cel3"
+        or M.sensorName == "bat1"
+        or M.sensorName == "bat2"
+        or M.sensorName == "bat3"
+        then
+        M.precision = 2
+    end
+
     M.conversionProgress = 1
     M.empty_line_y = M.DEFAULT_CENTER_Y + 5*sensIdx
-    log("init(%s, colId: %s, %s, unit: %s)", M.idx, M.colId, M.sensorName, M.unit)
+    log("init(%s, colId: %s, %s, unit: %s, precision: %s)", M.idx, M.colId, M.sensorName, M.unit, M.precision)
 
 end
 
